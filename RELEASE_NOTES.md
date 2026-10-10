@@ -1,3 +1,17 @@
+# Duo Status Bar 1.4.2 — stable
+
+The 1.4.2 beta line, plus fixes from user reports. Safe to keep switched on.
+
+- **Every bar now draws the same element.** The lock screen and the pulled-down shade used to draw the
+  ring at a different size, and could even fall back to the simple drawing while the home bar used the
+  animated one. All three bars now share one size and one renderer.
+- **The colour follows the bar again.** On some ROMs the element flickered between black and white
+  because the bar's brightness was mistaken for a colour; it now reads the real icon tint.
+- **Measured ROM profiles actually load** (they were never read from the module's own files before).
+- **New "Show charging bolt" switch.** You can hide the bolt while charging, independent of the charging
+  animation. The ring still turns green for a charging battery.
+- The settings previews show 40% so the ring reads clearly.
+
 # Duo Status Bar 1.4.2-beta.2 — pre-release
 
 Fixes from testing beta.1.
