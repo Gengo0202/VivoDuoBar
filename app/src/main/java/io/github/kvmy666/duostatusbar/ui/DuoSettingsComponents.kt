@@ -252,7 +252,7 @@ internal fun PositionEditor(
                     .padding(end = 16.dp)
                     .size(32.dp),
                 visual = visual ?: DuoMapping.visual(
-                    level = 78,
+                    level = 40,
                     charging = false,
                     saver = false,
                     showPercent = true,

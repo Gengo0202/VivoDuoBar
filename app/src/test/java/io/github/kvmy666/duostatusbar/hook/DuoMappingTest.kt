@@ -199,6 +199,19 @@ class DuoMappingTest {
     }
 
     @Test
+    fun `hiding the charging bolt restores the percentage while the ring stays green`() {
+        val v = DuoMapping.visual(
+            level = 42, charging = true, saver = false, showPercent = true,
+            wifiLevel = 3, cellLevel = 4, airplane = false, showCharging = false
+        )
+        assertEquals("42", v.percentText)
+        assertEquals(1f, v.percentOpacity, 0.0001f)
+        assertEquals(0f, v.boltOpacity, 0.0001f)
+        // The battery is still charging, so the ring keeps its charging colour.
+        assertEquals(DuoMapping.GREEN_CHARGING, v.tint)
+    }
+
+    @Test
     fun `a normal reading shows the number and no bolt`() {
         val v = visual(42)
         assertEquals("42", v.percentText)

@@ -41,6 +41,8 @@ internal data class ModuleSettings(
     val arrivalEnabled: Boolean,
     val departureEnabled: Boolean,
     val chargingEnabled: Boolean,
+    /** Whether the charging bolt is drawn at all (separate from [chargingEnabled], the animation). */
+    val showChargingBolt: Boolean,
     /** "auto" follows the bar's own icon colour; "black"/"white" are manual overrides. */
     val iconColor: String,
     /** False leaves the icons Duo does not replace (silent, vibrate, alarm…) visible. */
@@ -92,6 +94,7 @@ internal data class ModuleSettings(
             arrivalEnabled = true,
             departureEnabled = true,
             chargingEnabled = true,
+            showChargingBolt = true,
             iconColor = "auto",
             hideOtherIcons = false,
             showAirplane = true,
@@ -358,6 +361,8 @@ internal object DuoSettingsClient {
         arrivalEnabled = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_ARRIVAL)) == 1,
         departureEnabled = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_DEPARTURE)) == 1,
         chargingEnabled = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_CHARGING)) == 1,
+        // Optional: a settings app that predates the column keeps the bolt (the original behaviour).
+        showChargingBolt = cursor.optionalBool(DuoPrefs.COL_SHOW_CHARGING_BOLT, true),
         iconColor = cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_ICON_COLOR)) ?: "auto",
         hideOtherIcons = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_HIDE_OTHER_ICONS)) == 1,
         showAirplane = cursor.optionalBool(
@@ -428,6 +433,7 @@ internal object DuoSettingsClient {
             arrivalEnabled = bool(DuoPrefs.COL_ARRIVAL, portrait.arrivalEnabled),
             departureEnabled = bool(DuoPrefs.COL_DEPARTURE, portrait.departureEnabled),
             chargingEnabled = bool(DuoPrefs.COL_CHARGING, portrait.chargingEnabled),
+            showChargingBolt = bool(DuoPrefs.COL_SHOW_CHARGING_BOLT, portrait.showChargingBolt),
             iconColor = str(DuoPrefs.COL_ICON_COLOR, portrait.iconColor),
             hideOtherIcons = bool(DuoPrefs.COL_HIDE_OTHER_ICONS, portrait.hideOtherIcons),
             showAirplane = bool(DuoPrefs.COL_SHOW_AIRPLANE, portrait.showAirplane),

@@ -14,6 +14,8 @@
     <string name="settings_master_detail">Turns the ring on or off.</string>
     <string name="settings_percent">Show battery percentage</string>
     <string name="settings_percent_detail">Show the battery number in the ring.</string>
+    <string name="settings_show_charging_bolt">Show charging bolt</string>
+    <string name="settings_show_charging_bolt_detail">Draw the bolt while charging. Turning the charging animation off only skips the travel.</string>
     <string name="settings_percent_height">Percentage height</string>
     <string name="settings_percent_height_detail">Raise the number above a camera cutout.</string>
     <string name="settings_size">Size</string>

@@ -74,6 +74,12 @@ data class DuoSettings(
     val departureEnabled: Boolean = true,
     val chargingEnabled: Boolean = true,
     /**
+     * Whether the charging bolt is drawn at all. Independent of [chargingEnabled], which only decides
+     * whether the bolt *travels*; this one removes it, so "no charging icon" is a choice and not a side
+     * effect of turning the animation off.
+     */
+    val showChargingBolt: Boolean = true,
+    /**
      * FR-05/18: what a gesture on the element asks Auto Expand to do. Its action keys, or `no_action`.
      * The defaults mean the element consumes no touches at all — no gestures, no conflicts.
      */
@@ -179,6 +185,7 @@ object DuoPrefs {
     const val COL_ARRIVAL = "arrival_enabled"
     const val COL_DEPARTURE = "departure_enabled"
     const val COL_CHARGING = "charging_enabled"
+    const val COL_SHOW_CHARGING_BOLT = "show_charging_bolt"
     const val COL_ICON_COLOR = "icon_color"
     const val COL_HIDE_OTHER_ICONS = "hide_other_icons"
     const val COL_NETWORK_ONLY = "network_only"
@@ -220,7 +227,8 @@ object DuoPrefs {
         COL_ANIMATIONS, COL_ARRIVAL, COL_DEPARTURE, COL_CHARGING,
         COL_ICON_COLOR, COL_HIDE_OTHER_ICONS, COL_NETWORK_ONLY, COL_SIM_CHOICE,
         COL_PERCENT_HEIGHT, COL_SPLIT_INDICATORS, COL_INDICATORS_OFFSET_X,
-        COL_WIFI_DOTS, COL_SHOW_AIRPLANE, COL_SHOW_DND, COL_EDGE_PADDING, COL_DND_MODE
+        COL_WIFI_DOTS, COL_SHOW_AIRPLANE, COL_SHOW_DND, COL_EDGE_PADDING, COL_DND_MODE,
+        COL_SHOW_CHARGING_BOLT
     )
 
     /** Landscape columns appended after [PORTRAIT_COLUMNS]. An older module ignores names it does not know. */
@@ -282,6 +290,7 @@ object DuoPrefs {
         arrivalEnabled = p.getBoolean(prefix + COL_ARRIVAL, true),
         departureEnabled = p.getBoolean(prefix + COL_DEPARTURE, true),
         chargingEnabled = p.getBoolean(prefix + COL_CHARGING, true),
+        showChargingBolt = p.getBoolean(prefix + COL_SHOW_CHARGING_BOLT, true),
         tapAction = p.getString(prefix + COL_TAP, "no_action") ?: "no_action",
         doubleTapAction = p.getString(prefix + COL_DOUBLE_TAP, "no_action") ?: "no_action",
         longPressAction = p.getString(prefix + COL_LONG_PRESS, "no_action") ?: "no_action",
@@ -341,6 +350,7 @@ object DuoPrefs {
         putBoolean(prefix + COL_ARRIVAL, settings.arrivalEnabled)
         putBoolean(prefix + COL_DEPARTURE, settings.departureEnabled)
         putBoolean(prefix + COL_CHARGING, settings.chargingEnabled)
+        putBoolean(prefix + COL_SHOW_CHARGING_BOLT, settings.showChargingBolt)
         putString(prefix + COL_TAP, settings.tapAction)
         putString(prefix + COL_DOUBLE_TAP, settings.doubleTapAction)
         putString(prefix + COL_LONG_PRESS, settings.longPressAction)

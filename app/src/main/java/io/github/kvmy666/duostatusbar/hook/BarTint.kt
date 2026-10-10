@@ -45,6 +45,24 @@ internal object BarTint {
         return changed
     }
 
+    /**
+     * The resolved icon colour among a hook callback's arguments, or 0 when none can be one.
+     *
+     * `StatusBarIconView.onDarkChanged(areas, darkIntensity, tint)` is called as the bar's scrim
+     * animates, and some OEM builds pass `darkIntensity` as an **int** rather than a float. Taking the
+     * first int (the old code) read that 0..255 intensity as a colour, so the element flipped black and
+     * white several times a second — exactly the HyperOS 3 report (`icon colour -> black`, then `white`,
+     * then `black`, while the bar never changed). A resolved ARGB colour is opaque; an intensity is not,
+     * so only ints with a non-zero alpha byte are accepted. The trailing int is the tint either way.
+     */
+    fun pickTint(arguments: Array<Any?>): Int {
+        var color = 0
+        for (argument in arguments) {
+            if (argument is Int && (argument ushr 24) != 0) color = argument
+        }
+        return color
+    }
+
     /** Black or white to draw the element in. Captured bar colour first, system day/night as fallback. */
     fun fgColor(context: Context): Int {
         if (captured) return normalized

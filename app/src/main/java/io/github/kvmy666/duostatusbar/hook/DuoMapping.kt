@@ -98,6 +98,11 @@ object DuoMapping {
         networkText: String = "",
         /** Whether the charging journey plays; false shows the bolt instantly. */
         animateCharge: Boolean = true,
+        /**
+         * Whether the charging bolt is drawn at all. False removes the bolt (and lets the percentage
+         * take the top gap again) while the ring still tints green for the charging battery.
+         */
+        showCharging: Boolean = true,
         /** Whether Airplane mode may take the middle slot. Off leaves that place to the network. */
         showAirplane: Boolean = true,
         /** Whether Do Not Disturb may take the middle slot. Off leaves that place to the network. */
@@ -135,13 +140,16 @@ object DuoMapping {
         val (outer, middle, dot) = SignalMapping.wifiOpacities(wifiLevel)
         val cells = SignalMapping.sphereOpacities(cellLevel, wifiLevel, airplane, wifiOn, wifiDots)
         val (circles, crescents, centerMoon) = signalDots(cells, dnd && dndDots)
-        val percent = if (showPercent && !charging) level.toString() else ""
-        val closed = RingGeometry.gapClosed(charging, showPercent)
+        // The bolt is the only thing the "show charging bolt" switch removes: the ring still tints green
+        // for a charging battery, but the top gap goes back to the percentage when the bolt is hidden.
+        val chargingVisual = charging && showCharging
+        val percent = if (showPercent && !chargingVisual) level.toString() else ""
+        val closed = RingGeometry.gapClosed(chargingVisual, showPercent)
         return DuoVisual(
-            trimLeftEnd = RingGeometry.trimLeft(level, charging, closed),
-            trimRightEnd = RingGeometry.trimRight(level, charging, closed),
-            leftArc = RingGeometry.leftArc(charging, showPercent),
-            rightArc = RingGeometry.rightArc(charging, showPercent),
+            trimLeftEnd = RingGeometry.trimLeft(level, chargingVisual, closed),
+            trimRightEnd = RingGeometry.trimRight(level, chargingVisual, closed),
+            leftArc = RingGeometry.leftArc(chargingVisual, showPercent),
+            rightArc = RingGeometry.rightArc(chargingVisual, showPercent),
             trackOpacity = 0.22f,
             percentText = percent.ifEmpty { " " },
             percentOpacity = if (percent.isEmpty()) 0f else 1f,
@@ -149,7 +157,7 @@ object DuoMapping {
             percentY = RingGeometry.percentTopY(percentHeight),
             // Only the slot's actual occupant carries text: a hidden one never shows a stale label.
             networkText = if (mode == SignalMapping.MIDDLE_NETWORK) networkText else "",
-            boltOpacity = if (charging) 1f else 0f,
+            boltOpacity = if (chargingVisual) 1f else 0f,
             wifiOuterOpacity = outer,
             wifiMidOpacity = middle,
             cell1Opacity = circles[0],
@@ -166,9 +174,9 @@ object DuoMapping {
             middleMode = mode,
             wifiLevel = wifiLevel,
             cellLevel = cellLevel,
-            charging = charging,
+            charging = chargingVisual,
             visible = visible,
-            animateCharge = animateCharge
+            animateCharge = animateCharge && showCharging
         )
     }
 

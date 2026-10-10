@@ -676,14 +676,11 @@ class DuoHook(private val lp: XC_LoadPackage.LoadPackageParam) {
             val callback = object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     try {
-                        // Both methods carry exactly one int: `onDarkChanged`'s tint and `setIconColor`'s
-                        // colour. The first int in the argument list is that value either way.
-                        for (arg in param.args) {
-                            if (arg is Int) {
-                                if (BarTint.update(arg)) monitor?.onBarAppearanceChanged()
-                                break
-                            }
-                        }
+                        // `onDarkChanged` carries a float `darkIntensity` and an int `tint`; some OEM
+                        // builds pass the intensity as an int too. [BarTint.pickTint] keeps only the
+                        // int(s) that can be a resolved colour, so an intensity is never read as one.
+                        val color = BarTint.pickTint(param.args)
+                        if (color != 0 && BarTint.update(color)) monitor?.onBarAppearanceChanged()
                     } catch (t: Throwable) {
                         L.w("bar tint: ${t.javaClass.simpleName}: ${t.message}")
                     }

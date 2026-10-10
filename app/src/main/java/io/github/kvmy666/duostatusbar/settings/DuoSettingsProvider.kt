@@ -156,7 +156,8 @@ class DuoSettingsProvider : ContentProvider() {
             if (settings.showAirplane) 1 else 0,
             if (DuoPrefs.dndInMiddle(settings.dndMode)) 1 else 0,
             settings.edgePadding.coerceIn(DuoPrefs.MIN_EDGE_PADDING, DuoPrefs.MAX_EDGE_PADDING),
-            DuoPrefs.normalizeDndMode(settings.dndMode)
+            DuoPrefs.normalizeDndMode(settings.dndMode),
+            if (settings.showChargingBolt) 1 else 0
         )
     }
 }

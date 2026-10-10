@@ -93,25 +93,29 @@ internal class DuoGuard(private val context: Context) {
      * gets cleared makes the next boot stop instead of repeating it.
      */
     fun riveAllowed(): Boolean {
+        // Once this process has already created a Rive view and is still alive to ask again, the risk
+        // has been taken: a native fault would have killed the process with it. The count is per process
+        // *by design* ([noteRiveAttempt]), so the later bars must not be blocked by the first bar's own
+        // attempt. They were: the main bar raised the counter to MAX, and the keyguard bar and the shade
+        // header then fell back to Canvas in the same process (measured on OxygenOS 16), so the lock
+        // screen drew a different element than the home bar with no visible reason.
+        val attempted = notedThisProcess.get()
         val attempts = attempts()
-        if (attempts < MAX_ATTEMPTS) return true
-        // The breaker is a crash-loop guard, not a life sentence. Two *unrelated* System UI restarts
-        // (the app's Restart button, the watchdog, a theme change) inside the few seconds before Rive has
-        // survived also bump the counter, and the old code then refused Rive forever — which is exactly
-        // the OxygenOS 16 report: `renderer=Canvas, riveAttempts=2`, and no way back without adb. So the
-        // count only stays armed while the last attempt is recent: a real crash loop retries within
-        // seconds and stays blocked, while a device that has been fine for a couple of minutes re-arms
-        // Rive on its next start.
         val age = lastAttemptAgeMs()
-        if (age > CRASH_WINDOW_MS) {
-            L.i("Rive attempts stale (${age / 1000}s old) - clearing the breaker and trying Rive again")
-            clearRiveAttempts()
+        if (shouldAllowRive(attempts, attempted, age)) {
+            // A full count that allowed through is a *stale* count, not a live crash loop, so clear it:
+            // the breaker is a crash-loop guard, not a life sentence (the old code blocked forever).
+            if (!attempted && attempts >= MAX_ATTEMPTS) {
+                L.i("Rive attempts stale (${age / 1000}s old) - clearing the breaker and trying Rive again")
+                clearRiveAttempts()
+            }
             return true
         }
         L.w("Rive refused: $attempts failed attempts recorded - clear with: adb shell settings put global $KEY_ATTEMPTS 0")
         return false
     }
 
+    /** How many Rive process deaths are recorded (the crash breaker's counter). */
     fun attempts(): Int = try {
         Settings.Global.getInt(context.contentResolver, KEY_ATTEMPTS, 0)
     } catch (_: Throwable) {
@@ -202,5 +206,16 @@ internal class DuoGuard(private val context: Context) {
 
         /** Sentinel for "the user never set an override": `getInt` cannot return null, so it needs one. */
         private const val ABSENT = -1
+
+        /**
+         * The pure decision behind [riveAllowed], so the boundary is unit-tested off the phone: Rive is
+         * allowed when this process has already taken the risk, or the counter has room, or the count is
+         * old enough to be stale rather than a live crash loop.
+         */
+        fun shouldAllowRive(attempts: Int, attemptedThisProcess: Boolean, attemptAgeMs: Long): Boolean {
+            if (attemptedThisProcess) return true
+            if (attempts < MAX_ATTEMPTS) return true
+            return attemptAgeMs > CRASH_WINDOW_MS
+        }
     }
 }

@@ -64,7 +64,9 @@ internal fun CustomizeSection(
             stringResource(R.string.settings_edge_padding),
             stringResource(R.string.settings_edge_padding_detail),
             stringResource(R.string.settings_size),
-            stringResource(R.string.settings_position), stringResource(R.string.settings_live_apply)
+            stringResource(R.string.settings_position), stringResource(R.string.settings_live_apply),
+            stringResource(R.string.settings_show_charging_bolt),
+            stringResource(R.string.settings_show_charging_bolt_detail)
         )
     ) Card(
         shape = RoundedCornerShape(22.dp),
@@ -100,6 +102,19 @@ internal fun CustomizeSection(
                     DuoSettingPreview(off = demo(showPercent = false), on = demo(showPercent = true))
                 }
             ) { onUpdate(settings.copy(showPercent = it)) }
+
+            SettingSwitch(
+                label = stringResource(R.string.settings_show_charging_bolt),
+                detail = stringResource(R.string.settings_show_charging_bolt_detail),
+                checked = settings.showChargingBolt,
+                enabled = settings.enabled,
+                preview = {
+                    DuoSettingPreview(
+                        off = demo(charging = true, showCharging = false),
+                        on = demo(charging = true, showCharging = true)
+                    )
+                }
+            ) { onUpdate(settings.copy(showChargingBolt = it)) }
 
             LabelledSlider(
                 label = "${stringResource(R.string.settings_percent_height)} ${settings.percentHeight}%",
@@ -676,6 +691,7 @@ private fun demo(
     showAirplane: Boolean = true,
     showDnd: Boolean = true,
     dndDots: Boolean = false,
+    showCharging: Boolean = true,
     cellLevel: Int = 4
 ) = DuoMapping.visual(
     level = level,
@@ -691,6 +707,7 @@ private fun demo(
     wifiDots = wifiDots,
     showAirplane = showAirplane,
     showDnd = showDnd,
+    showCharging = showCharging,
     dndDots = dndDots
 )
 
@@ -702,7 +719,7 @@ private fun dndPreview(mode: String) = when (mode) {
 }
 
 /** FR-09: a level that shows a clear half-full ring rather than an empty or full one. */
-private const val DEMO_LEVEL = 72
+private const val DEMO_LEVEL = 40
 
 /** FR-25: the five arrival speeds, slowest first, matching [DuoPrefs.REVEAL_CHOICES] reversed. */
 private val SPEED_LABELS = listOf("Slow", "Relaxed", "Normal", "Brisk", "Fast")

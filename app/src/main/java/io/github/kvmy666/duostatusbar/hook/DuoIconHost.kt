@@ -97,9 +97,8 @@ internal class DuoIconHost(private val context: Context) {
         var indicators: DuoElement? = null
 
         /**
-         * The slot width captured *before* the stock icons were hidden. Re-measuring later would read
-         * the hidden battery's 0-width and fall back to the strip height, which changes the element's
-         * size mid-session and forces a live relayout (see [SlotGeometry]).
+         * The slot width to draw at. It is the width pinned for the main bar at attach — one size for
+         * every bar — falling back to this bar's own measurement only when the main bar captured none.
          */
         var basePx = 0
     }
@@ -294,7 +293,11 @@ internal class DuoIconHost(private val context: Context) {
         val candidate = createElement(elementRoot, stage, ringPart())
         slot.container = target
         slot.bar = cap ?: target
-        slot.basePx = geometry.measuredWidth(target)
+        // One size for every bar: reuse the width pinned for the main bar at attach, so the lock screen
+        // and the shade header cannot draw the ring at a different size than the home bar (reported: "the
+        // icon is bigger on the lock screen"). Falls back to this bar's own measurement only when the main
+        // bar never captured one. The bar-height cap in [SlotGeometry.sidePx] still applies per bar.
+        slot.basePx = if (geometry.slotBasePx > 0) geometry.slotBasePx else geometry.measuredWidth(target)
         slot.element = candidate
         extras.add(slot)
         allowOverflow(target)
@@ -438,6 +441,9 @@ internal class DuoIconHost(private val context: Context) {
     val arrivalEnabled: Boolean get() = settings.animationsEnabled && settings.arrivalEnabled
     val departureEnabled: Boolean get() = settings.animationsEnabled && settings.departureEnabled
     val chargingEnabled: Boolean get() = settings.animationsEnabled && settings.chargingEnabled
+
+    /** FR-15: whether the charging bolt is drawn at all. Asked by the monitor on every render. */
+    val showChargingBolt: Boolean get() = settings.showChargingBolt
 
     /**
      * Shows or hides every element's view outright.

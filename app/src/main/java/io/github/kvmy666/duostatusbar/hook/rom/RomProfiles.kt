@@ -23,6 +23,7 @@ import org.json.JSONObject
 internal object RomProfiles {
 
     private const val ASSET = "rom-profiles.json"
+    private const val MODULE_PACKAGE = "io.github.kvmy666.duostatusbar"
 
     @Volatile
     private var cache: List<RomAdapter>? = null
@@ -33,7 +34,7 @@ internal object RomProfiles {
         synchronized(this) {
             cache?.let { return it }
             val parsed = try {
-                context.assets.open(ASSET).bufferedReader().use { parse(it.readText()) }
+                readAsset(context)
             } catch (t: Throwable) {
                 L.w("rom profiles unreadable: ${t.javaClass.simpleName}: ${t.message}")
                 emptyList()
@@ -41,6 +42,24 @@ internal object RomProfiles {
             cache = parsed
         }
         return cache ?: emptyList()
+    }
+
+    /**
+     * Reads the module's own asset, not the host's.
+     *
+     * The module runs *inside System UI*, so its [Context] is SystemUI's, and SystemUI has no
+     * `rom-profiles.json` — every report showed `FileNotFoundException: rom-profiles.json`, so the
+     * measured profiles never loaded on any device. The module's APK is a different package, so the
+     * asset is read through that package's context instead (the same route [DuoRiveView] uses for the
+     * `.riv`). The direct open stays first so the in-app preview and tests, which already have the
+     * asset, keep working.
+     */
+    private fun readAsset(context: Context): List<RomAdapter> {
+        runCatching { context.assets.open(ASSET) }.getOrNull()?.let { stream ->
+            return stream.bufferedReader().use { parse(it.readText()) }
+        }
+        val module = context.createPackageContext(MODULE_PACKAGE, 0)
+        return module.assets.open(ASSET).bufferedReader().use { parse(it.readText()) }
     }
 
     /** Parses the JSON body. A blank id or an empty container list skips that entry. */
