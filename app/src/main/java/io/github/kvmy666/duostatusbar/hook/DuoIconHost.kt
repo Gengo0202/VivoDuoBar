@@ -101,6 +101,7 @@ internal class DuoIconHost(private val context: Context) {
          * every bar — falling back to this bar's own measurement only when the main bar captured none.
          */
         var basePx = 0
+        val stock = StockIconHider()
     }
 
     /**
@@ -118,7 +119,8 @@ internal class DuoIconHost(private val context: Context) {
             ) return
             var parent: View? = view.parent as? View
             while (parent != null) {
-                if (parent === host || extras.any { it.container === parent }) {
+                val extra = extras.firstOrNull { it.container === parent }
+                if (parent === host || extra != null) {
                     val container = parent
                     logOnce.once("added:${view.javaClass.simpleName}") {
                         L.i("hiding a status icon as it arrives: ${view.javaClass.simpleName} in " +
@@ -127,7 +129,7 @@ internal class DuoIconHost(private val context: Context) {
                     // FR-08b: with "hide other icons" off, only the icons Duo replaces are hidden; the
                     // silent/vibrate/alarm ones are left for the user.
                     if (settings.hideOtherIcons || hider.isReplaced(view)) {
-                        hider.hide(view)
+                        (extra?.stock ?: hider).hide(view)
                     } else {
                         logOnce.once("kept:${view.javaClass.simpleName}") {
                             L.i("keeping a status icon: ${view.javaClass.simpleName} - FR-08b")
@@ -239,17 +241,33 @@ internal class DuoIconHost(private val context: Context) {
      * found by walking up from the `statusIcons` container the controller itself binds to.
      */
     fun attachShadeHeader(header: View): Boolean {
-        if (extras.any { it.name == "shade header" }) return true
-        val area = finder.findShadeIconsArea(header)
-        if (area == null) {
-            logOnce.once("missing:shade header") {
-                L.w("shade header: no icon area found in ${header.javaClass.simpleName}")
+        // The whole path is guarded: it runs from a SystemUI lifecycle callback (the header controller's
+        // constructor, a ViewStub inflate, a shade layout pass), so anything it throws would surface in
+        // SystemUI itself, not here. A failure returns false and leaves the stock header untouched -
+        // never a half-attached extra bar (FR-21).
+        return try {
+            val area = finder.findShadeIconsArea(header)
+            if (area == null) {
+                logOnce.once("missing:shade header") {
+                    L.w("shade header: no icon area found in ${header.javaClass.simpleName}")
+                }
+                return false
             }
-            return false
+            val previous = extras.firstOrNull { it.name == "shade header" }
+            if (previous?.container === area) return true
+            if (previous != null) {
+                drop(previous.indicators, previous.container)
+                drop(previous.element, previous.container)
+                previous.stock.restore()
+                extras.remove(previous)
+            }
+            // Centred on the header, not the icon area: the area is a 0x0 strip at the header's end
+            // (measured - it is laid out later), and the header is what has a real height to cap against.
+            attachExtraView("shade header", area, header, center = false)
+        } catch (t: Throwable) {
+            L.e("shade header attach: ${t.javaClass.simpleName}: ${t.message}")
+            false
         }
-        // Centred on the header, not the icon area: the area is a 0x0 strip at the header's end
-        // (measured - it is laid out later), and the header is what has a real height to cap against.
-        return attachExtraView("shade header", area, header, center = false)
     }
 
     /** Attaches into an already-known container (the shade header's icon area). */
@@ -308,16 +326,27 @@ internal class DuoIconHost(private val context: Context) {
         syncExtraIndicators(slot)
         candidate.onReady {
             if (slot.element !== candidate) return@onReady
-            hideStock(target, candidate.ui)
-            candidate.reveal(settings.revealMs)
-            L.i("Duo injected into $name ($logClass, ${side}px) - FR-03b")
+            // The ready callback arrives from the Rive instance poll, i.e. outside attachExtraView's try.
+            // Guard it here so a hiding failure in an optional bar can never propagate into SystemUI.
+            try {
+                hideStock(target, candidate.ui, owner = slot.stock)
+                candidate.reveal(settings.revealMs)
+                L.i("Duo injected into $name ($logClass, ${side}px) - FR-03b")
+            } catch (t: Throwable) {
+                L.w("$name ready: ${t.javaClass.simpleName}: ${t.message}")
+            }
         }
         candidate.onFailed {
             // Optional bar: drop the element and leave its stock icons alone.
-            L.w("$name element did not bind - leaving its stock icons")
-            runCatching { target.removeView(candidate.ui) }
-            runCatching { candidate.teardown() }
-            extras.remove(slot)
+            try {
+                L.w("$name element did not bind - leaving its stock icons")
+                runCatching { target.removeView(candidate.ui) }
+                runCatching { candidate.teardown() }
+                slot.stock.restore()
+                extras.remove(slot)
+            } catch (t: Throwable) {
+                L.w("$name failed: ${t.javaClass.simpleName}: ${t.message}")
+            }
         }
         return true
     }
@@ -424,12 +453,12 @@ internal class DuoIconHost(private val context: Context) {
      * FR-08/08b: hides the stock views per the user's choice — everything, or only what Duo replaces.
      * One place so the main bar, the keyguard bar and the shade header can never disagree.
      */
-    private fun hideStock(container: ViewGroup, keep: View?, keepLayout: View? = null) {
+    private fun hideStock(container: ViewGroup, keep: View?, keepLayout: View? = null, owner: StockIconHider = hider) {
         val ours = ourViews()
         if (settings.hideOtherIcons) {
-            hider.hideAllExcept(container, keep, keepLayout, ours)
+            owner.hideAllExcept(container, keep, keepLayout, ours)
         } else {
-            hider.hideReplaced(container, keep, keepLayout, ours)
+            owner.hideReplaced(container, keep, keepLayout, ours)
         }
     }
 
@@ -525,6 +554,7 @@ internal class DuoIconHost(private val context: Context) {
         if (!(element?.isReady ?: false)) return
         L.i("hiding mode changed (hideOtherIcons=${settings.hideOtherIcons}) - re-applying")
         hider.restore()
+        extras.forEach { it.stock.restore() }
         reapplyHiding()
     }
 
@@ -1046,6 +1076,7 @@ internal class DuoIconHost(private val context: Context) {
                 slot.indicators = null
                 slot.element?.let { slot.container?.removeView(it.ui) }
                 slot.element?.teardown()
+                slot.stock.restore()
             } catch (_: Throwable) {
             }
         }
@@ -1076,7 +1107,7 @@ internal class DuoIconHost(private val context: Context) {
             val keep = slot.element?.ui ?: continue
             if (!(slot.element?.isReady ?: false)) continue
             try {
-                hideStock(target, keep)
+                hideStock(target, keep, owner = slot.stock)
             } catch (t: Throwable) {
                 L.w("${slot.name} hiding: ${t.javaClass.simpleName}: ${t.message}")
             }

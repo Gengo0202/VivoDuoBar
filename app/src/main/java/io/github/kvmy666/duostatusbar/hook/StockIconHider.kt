@@ -96,7 +96,11 @@ internal class StockIconHider {
             return true
         }
         val cls = view.javaClass.simpleName.lowercase()
-        return cls.contains("battery") || cls.contains("wifi") || cls.contains("mobile")
+        // `combinedstatusview` is One UI's stock battery/Wi-Fi/mobile cluster. It is named by class only
+        // (PR #14): a readable slot always decides first, so this is reached only when the slot is
+        // unreadable, matching the same view the main-bar overlay anchors on.
+        return cls.contains("battery") || cls.contains("wifi") || cls.contains("mobile") ||
+            cls == "combinedstatusview"
     }
 
     /** `StatusBarIconView.getSlot()`, or the OEM `getSlotTag()`; null when neither exists. */
