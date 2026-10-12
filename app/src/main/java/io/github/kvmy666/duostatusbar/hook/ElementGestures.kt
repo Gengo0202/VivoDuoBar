@@ -17,14 +17,27 @@ import io.github.kvmy666.duostatusbar.hook.integration.AutoExpand
  * twice. With every action set to `no_action` the detector is dropped and the view is not clickable, so
  * touches fall straight through to whoever handled them before.
  */
-internal class ElementGestures(private val context: Context) {
+internal class ElementGestures(
+    private val context: Context,
+    private val singleTapOverride: (() -> Boolean)? = null
+) {
+
+    enum class HitRegion { VIEW, RING, INDICATORS }
 
     private var detector: GestureDetector? = null
     private var active = false
 
     /** Installs (or clears) the detector for the current actions. */
-    fun install(view: View, tap: String, doubleTap: String, longPress: String) {
-        if (tap == AutoExpand.NO_ACTION && doubleTap == AutoExpand.NO_ACTION && longPress == AutoExpand.NO_ACTION) {
+    fun install(
+        view: View,
+        tap: String,
+        doubleTap: String,
+        longPress: String,
+        singleTapOverrideActive: Boolean = false
+    ) {
+        if (!singleTapOverrideActive && tap == AutoExpand.NO_ACTION &&
+            doubleTap == AutoExpand.NO_ACTION && longPress == AutoExpand.NO_ACTION
+        ) {
             detector = null
             view.setOnTouchListener(null)
             view.isClickable = false
@@ -40,6 +53,7 @@ internal class ElementGestures(private val context: Context) {
             // The confirmed callback only fires once the double-tap window has passed.
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 L.i("gesture: single tap")
+                if (singleTapOverrideActive && singleTapOverride?.invoke() == true) return true
                 return AutoExpand.request(context, tap)
             }
             override fun onDoubleTap(e: MotionEvent): Boolean {
@@ -53,7 +67,10 @@ internal class ElementGestures(private val context: Context) {
         })
         view.setOnTouchListener(null)
         view.isClickable = true
-        L.i("gestures on: tap=$tap doubleTap=$doubleTap longPress=$longPress (driven from the status-bar touch hook)")
+        L.i(
+            "gestures on: tap=$tap doubleTap=$doubleTap longPress=$longPress " +
+                "override=$singleTapOverrideActive (driven from the status-bar touch hook)"
+        )
     }
 
     /**
@@ -89,16 +106,32 @@ internal class ElementGestures(private val context: Context) {
         }
     }
 
-    private fun hit(event: MotionEvent, view: View): Boolean {
+    /** True when the touch is inside the visible part, independent of whether it has an action. */
+    fun contains(
+        event: MotionEvent,
+        views: List<View>,
+        region: HitRegion = HitRegion.VIEW
+    ): Boolean = views.any { hit(event, it, region) }
+
+    private fun hit(event: MotionEvent, view: View, region: HitRegion = HitRegion.VIEW): Boolean {
         val location = IntArray(2)
         try {
             view.getLocationOnScreen(location)
         } catch (_: Throwable) {
             return false
         }
-        val left = location[0]
-        val top = location[1]
-        return event.rawX >= left && event.rawX <= left + view.width &&
-            event.rawY >= top && event.rawY <= top + view.height
+        val x = event.rawX - location[0]
+        val y = event.rawY - location[1]
+        if (x < 0f || x > view.width || y < 0f || y > view.height) return false
+        if (region == HitRegion.VIEW) return true
+
+        // The artboard is taller than it is wide; the ring sits in its lower square. Restricting
+        // split-mode hits to visible geometry prevents two transparent 120x136 artboards from both
+        // claiming the same touch when their independently positioned views overlap.
+        return when (region) {
+            HitRegion.RING -> ElementHitGeometry.ring(x, y, view.width, view.height)
+            HitRegion.INDICATORS -> ElementHitGeometry.indicators(x, y, view.width, view.height)
+            HitRegion.VIEW -> true
+        }
     }
 }

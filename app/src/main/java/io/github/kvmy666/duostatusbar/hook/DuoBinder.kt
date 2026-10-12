@@ -50,7 +50,7 @@ object DuoBinder {
     val REVEAL_CHOICES = intArrayOf(500, 750, 1000, 1250, 1500)
 
     /** Number of properties a complete snapshot writes — used to report partial failures. */
-    const val PROPERTY_COUNT = 32
+    const val PROPERTY_COUNT = 53
 
     private const val REVEAL_MS = "revealMs"
     private const val PERCENT_TEXT = "percentText"
@@ -69,6 +69,12 @@ object DuoBinder {
     /** Writes the whole snapshot. Returns how many properties failed to bind (0 is perfect). */
     internal fun write(vm: ViewModelInstance, v: DuoVisual): Int {
         var failures = 0
+        val gradient = v.downloadGradient
+        val gradientColors = gradient?.riveColors() ?: List(5) { v.downloadColor }
+        val gradientPositions = gradient?.rivePositions() ?: listOf(0f, 1f, 1f, 1f, 1f)
+        val gradientPoints =
+            gradient?.points(-DOWNLOAD_RADIUS, -DOWNLOAD_RADIUS, DOWNLOAD_RADIUS, DOWNLOAD_RADIUS)
+                ?: floatArrayOf(-DOWNLOAD_RADIUS, 0f, DOWNLOAD_RADIUS, 0f)
 
         val numbers = arrayOf(
             "trimLeftEnd" to v.trimLeftEnd,
@@ -104,13 +110,39 @@ object DuoBinder {
             "centerMoonOpacity" to v.centerMoonOpacity,
             "centerMoonScale" to v.centerMoonOpacity * DotMoonMotion.DOT_SCALE,
             // The whole middle-slot hand-over is one Rive layer; this only says which occupant.
-            "middleMode" to v.middleMode.toFloat()
+            "middleMode" to v.middleMode.toFloat(),
+            // Download wash on the white ring. Zero opacity and zero lengths leave the battery stroke
+            // exactly as it was. Offsets move only for the counter-clockwise direction.
+            "downloadLeftEnd" to v.downloadLeftEnd,
+            "downloadLeftOffset" to v.downloadLeftOffset,
+            "downloadRightEnd" to v.downloadRightEnd,
+            "downloadRightOffset" to v.downloadRightOffset,
+            "downloadOpacity" to if (gradient == null) v.downloadOpacity else 0f,
+            "downloadGradientOpacity" to if (gradient != null) v.downloadOpacity else 0f,
+            "downloadGradientStop1" to gradientPositions[0],
+            "downloadGradientStop2" to gradientPositions[1],
+            "downloadGradientStop3" to gradientPositions[2],
+            "downloadGradientStop4" to gradientPositions[3],
+            "downloadGradientStop5" to gradientPositions[4],
+            "downloadGradientStartX" to gradientPoints[0],
+            "downloadGradientStartY" to gradientPoints[1],
+            "downloadGradientEndX" to gradientPoints[2],
+            "downloadGradientEndY" to gradientPoints[3]
         )
         for ((name, value) in numbers) {
             if (!write(name) { vm.getNumberProperty(name).value = value }) failures++
         }
 
-        val colors = arrayOf("tint" to v.tint, "fgColor" to v.fgColor)
+        val colors = arrayOf(
+            "tint" to v.tint,
+            "fgColor" to v.fgColor,
+            "downloadColor" to v.downloadColor,
+            "downloadGradientColor1" to gradientColors[0],
+            "downloadGradientColor2" to gradientColors[1],
+            "downloadGradientColor3" to gradientColors[2],
+            "downloadGradientColor4" to gradientColors[3],
+            "downloadGradientColor5" to gradientColors[4]
+        )
         for ((name, value) in colors) {
             if (!write(name) { vm.getColorProperty(name).value = value }) failures++
         }
@@ -139,6 +171,8 @@ object DuoBinder {
         L.w("bind $name: ${t.javaClass.simpleName}: ${t.message}")
         false
     }
+
+    private const val DOWNLOAD_RADIUS = 51.5f
 }
 
 /**

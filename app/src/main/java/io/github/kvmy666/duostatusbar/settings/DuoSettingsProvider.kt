@@ -151,13 +151,20 @@ class DuoSettingsProvider : ContentProvider() {
             settings.simChoice,
             settings.percentHeight.coerceIn(DuoPrefs.MIN_PERCENT_HEIGHT, DuoPrefs.MAX_PERCENT_HEIGHT),
             if (settings.splitIndicators) 1 else 0,
-            settings.indicatorsOffsetX.coerceIn(-DuoPrefs.MAX_OFFSET, DuoPrefs.MAX_OFFSET),
+            settings.indicatorsOffsetX.coerceIn(
+                -DuoPrefs.MAX_INDICATORS_OFFSET,
+                DuoPrefs.MAX_INDICATORS_OFFSET
+            ),
             if (settings.wifiDots) 1 else 0,
             if (settings.showAirplane) 1 else 0,
             if (DuoPrefs.dndInMiddle(settings.dndMode)) 1 else 0,
             settings.edgePadding.coerceIn(DuoPrefs.MIN_EDGE_PADDING, DuoPrefs.MAX_EDGE_PADDING),
             DuoPrefs.normalizeDndMode(settings.dndMode),
-            if (settings.showChargingBolt) 1 else 0
+            if (settings.showChargingBolt) 1 else 0,
+            if (settings.lockRing) 1 else 0,
+            settings.indicatorsTapAction,
+            settings.indicatorsDoubleTapAction,
+            settings.indicatorsLongPressAction
         )
     }
 }

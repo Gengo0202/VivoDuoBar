@@ -27,8 +27,11 @@
     <string name="settings_position_hint">Drag left or right</string>
     <string name="settings_split">Icons outside the ring</string>
     <string name="settings_split_detail">Move Wi-Fi and signal icons outside the ring.</string>
+    <string name="settings_lock_ring">Lock ring to the screen</string>
+    <string name="settings_lock_ring_detail">Holds the ring on the center of the screen</string>
     <string name="settings_ring_position">Ring position</string>
     <string name="settings_ring_position_hint">Drag the ring</string>
+    <string name="settings_ring_position_locked_hint">Zero is the middle of the screen. Drag left or right from there.</string>
     <string name="settings_indicators_position">Icon position</string>
     <string name="settings_indicators_position_hint">Drag the icons</string>
     <string name="settings_edge_padding">Edge spacing</string>
@@ -82,6 +85,9 @@
     <string name="section_actions">Tap actions</string>
     <string name="settings_gestures_note">Taps are handled by Auto Expand.</string>
     <string name="settings_gestures_missing">Tap actions need the Auto Expand app.</string>
+    <string name="settings_ring_actions">Ring</string>
+    <string name="settings_indicator_actions">Icons</string>
+    <string name="settings_download_tap_note">While download progress is on the ring, single-tap the ring to switch between download progress and the battery. This temporarily replaces the ring’s configured single-tap action.</string>
     <string name="settings_tap">Single tap</string>
     <string name="settings_double_tap">Double tap</string>
     <string name="settings_long_press">Long press</string>

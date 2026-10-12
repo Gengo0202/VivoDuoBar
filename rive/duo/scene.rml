@@ -54,6 +54,113 @@
                 <DataBindContext propertyKey="14" sourcePathIds="0:60-0:181" />
             </Text>
 
+            <!-- Download wash. Declared before the battery fill so it paints on top of the white
+                 stroke (first sibling paints on top) and under the digits. Opacity 0, the default,
+                 leaves the ring unchanged. Length and offset come from Kotlin, from the same caps. -->
+            <Shape opacity="0" name="downloadFillL" id="0:210">
+                <Ellipse width="103" height="103" originX="0.5" originY="0.5" name="Path" />
+                <Stroke thickness="8" cap="round" join="round" name="Stroke">
+                    <SolidColor colorValue="FF0A84FF" name="Color">
+                        <DataBindContext propertyKey="37" sourcePathIds="0:60-0:217" />
+                    </SolidColor>
+                    <TrimPath start="0" end="0" offset="0.6631" name="Trim">
+                        <DataBindContext propertyKey="115" sourcePathIds="0:60-0:212" />
+                        <DataBindContext propertyKey="116" sourcePathIds="0:60-0:213" />
+                    </TrimPath>
+                </Stroke>
+                <DataBindContext propertyKey="18" sourcePathIds="0:60-0:216" />
+            </Shape>
+
+            <Shape opacity="0" name="downloadFillR" id="0:211">
+                <Ellipse width="103" height="103" originX="0.5" originY="0.5" name="Path" />
+                <Stroke thickness="8" cap="round" join="round" name="Stroke">
+                    <SolidColor colorValue="FF0A84FF" name="Color">
+                        <DataBindContext propertyKey="37" sourcePathIds="0:60-0:217" />
+                    </SolidColor>
+                    <TrimPath start="0" end="0" offset="0.0990" name="Trim">
+                        <DataBindContext propertyKey="115" sourcePathIds="0:60-0:214" />
+                        <DataBindContext propertyKey="116" sourcePathIds="0:60-0:215" />
+                    </TrimPath>
+                </Stroke>
+                <DataBindContext propertyKey="18" sourcePathIds="0:60-0:216" />
+            </Shape>
+
+            <!-- Linear-gradient variant of the download wash. Kotlin keeps this mutually exclusive
+                 with the solid pair above and supplies up to five bound stops plus the angle. -->
+            <Shape opacity="0" name="downloadGradientFillL" id="0:218">
+                <Ellipse width="103" height="103" originX="0.5" originY="0.5" name="Path" />
+                <Stroke thickness="8" cap="round" join="round" name="Stroke">
+                    <LinearGradient startX="-51.5" startY="0" endX="51.5" endY="0" name="Gradient">
+                        <DataBindContext propertyKey="42" sourcePathIds="0:60-0:231" />
+                        <DataBindContext propertyKey="33" sourcePathIds="0:60-0:232" />
+                        <DataBindContext propertyKey="34" sourcePathIds="0:60-0:233" />
+                        <DataBindContext propertyKey="35" sourcePathIds="0:60-0:234" />
+                        <GradientStop colorValue="FF0A84FF" position="0">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:221" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:226" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:222" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:227" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:223" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:228" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:224" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:229" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:225" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:230" />
+                        </GradientStop>
+                    </LinearGradient>
+                    <TrimPath start="0" end="0" offset="0.6631" name="Trim">
+                        <DataBindContext propertyKey="115" sourcePathIds="0:60-0:212" />
+                        <DataBindContext propertyKey="116" sourcePathIds="0:60-0:213" />
+                    </TrimPath>
+                </Stroke>
+                <DataBindContext propertyKey="18" sourcePathIds="0:60-0:220" />
+            </Shape>
+
+            <Shape opacity="0" name="downloadGradientFillR" id="0:219">
+                <Ellipse width="103" height="103" originX="0.5" originY="0.5" name="Path" />
+                <Stroke thickness="8" cap="round" join="round" name="Stroke">
+                    <LinearGradient startX="-51.5" startY="0" endX="51.5" endY="0" name="Gradient">
+                        <DataBindContext propertyKey="42" sourcePathIds="0:60-0:231" />
+                        <DataBindContext propertyKey="33" sourcePathIds="0:60-0:232" />
+                        <DataBindContext propertyKey="34" sourcePathIds="0:60-0:233" />
+                        <DataBindContext propertyKey="35" sourcePathIds="0:60-0:234" />
+                        <GradientStop colorValue="FF0A84FF" position="0">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:221" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:226" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:222" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:227" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:223" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:228" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:224" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:229" />
+                        </GradientStop>
+                        <GradientStop colorValue="FF00BCD4" position="1">
+                            <DataBindContext propertyKey="38" sourcePathIds="0:60-0:225" />
+                            <DataBindContext propertyKey="39" sourcePathIds="0:60-0:230" />
+                        </GradientStop>
+                    </LinearGradient>
+                    <TrimPath start="0" end="0" offset="0.0990" name="Trim">
+                        <DataBindContext propertyKey="115" sourcePathIds="0:60-0:214" />
+                        <DataBindContext propertyKey="116" sourcePathIds="0:60-0:215" />
+                    </TrimPath>
+                </Stroke>
+                <DataBindContext propertyKey="18" sourcePathIds="0:60-0:220" />
+            </Shape>
+
             <!-- ============================ battery ring ============================
                  Ring r 51.5 (Ellipse 103x103), stroke 8, round caps.
                  Drawn arc 238.7deg -> 121.3deg clockwise, split by the top gap that holds the
@@ -751,22 +858,16 @@
 
             <!-- Layer 2 owns the airplane morph (FR-25): the Wi-Fi arcs collapse into the centre dot,
                  then the plane grows out of it. Blends independently of the reveal layer. -->
-            <!-- MiddleSlot: the slot holds exactly one occupant, so this is a star rather than a mesh -
-                 every morph leaves the Wi-Fi pose and returns to it. That is also why the arcs always
-                 retract the same way before something new arrives: the slot has one way of emptying.
+            <!-- MiddleSlot: the slot holds exactly one occupant. A real Wi-Fi hand-off still passes
+                 through the Wi-Fi pose. The cellular label and the empty slot do not: data on/off goes
+                 straight between the label and the empty slot (`NetInFromOff` / `NetOutToOff`), and
+                 airplane mode arrives from either of those without drawing the Wi-Fi glyph
+                 (`NetToPlane` / `PlaneInFromOff`). Routing those through Wi-Fi flashed the glyph.
 
-                 `middleMode` is a number (0 off, 1 Wi-Fi, 2 airplane, 3 DND) rather than one boolean per
-                 occupant, because the slot can only hold one thing and a transition can compare a
-                 number. The layer runs independently of Body, so a plane can already be showing while
-                 the element is still arriving. -->
-            <!-- MiddleSlot: the slot holds exactly one occupant, so this is a star rather than a mesh -
-                 every morph leaves the Wi-Fi pose and returns to it. That is also why the arcs always
-                 retract the same way before something new arrives: the slot has one way of emptying.
-
-                 `middleMode` is a number (0 off, 1 Wi-Fi, 2 airplane, 3 DND) rather than one boolean per
-                 occupant, because the slot can only hold one thing and a transition can compare a
-                 number. The layer runs independently of Body, so a plane can already be showing while
-                 the element is still arriving. -->
+                 `middleMode` is a number (0 off, 1 Wi-Fi, 2 airplane, 3 DND, 4 network) rather than one
+                 boolean per occupant, because the slot can only hold one thing and a transition can
+                 compare a number. The layer runs independently of Body, so a plane can already be
+                 showing while the element is still arriving. -->
             <StateMachineLayer name="MiddleSlot" id="0:98">
                 <AnyState x="200" y="-120" />
                 <ExitState x="400" y="-120" />
@@ -828,7 +929,9 @@
                             <TransitionValueNumberComparator value="1" />
                         </TransitionViewModelCondition>
                     </StateTransition>
-                    <StateTransition stateToId="0:177" duration="0">
+                    <!-- Data coming back while Wi-Fi is off. NetIn starts from the Wi-Fi pose, which
+                         flashed the glyph on a data toggle. This entrance starts from the empty slot. -->
+                    <StateTransition stateToId="0:204" duration="0">
                         <TransitionViewModelCondition opValue="equal">
                             <TransitionPropertyViewModelComparator>
                                 <BindablePropertyNumber>
@@ -836,6 +939,18 @@
                                 </BindablePropertyNumber>
                             </TransitionPropertyViewModelComparator>
                             <TransitionValueNumberComparator value="4" />
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                    <!-- Airplane from an empty slot. The only other way out of here is the Wi-Fi pose,
+                         which never draws the plane, so turning airplane on left the gap and no icon. -->
+                    <StateTransition stateToId="0:208" duration="0">
+                        <TransitionViewModelCondition opValue="equal">
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyNumber>
+                                    <DataBindContext sourcePathIds="0:60-0:107" propertyKey="636" />
+                                </BindablePropertyNumber>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueNumberComparator value="2" />
                         </TransitionViewModelCondition>
                     </StateTransition>
                 </AnimationState>
@@ -887,6 +1002,31 @@
                 </AnimationState>
 
                 <AnimationState x="600" y="140" animationId="0:174" id="0:178">
+                    <!-- Mobile data off, Wi-Fi still off: the label leaves straight into the empty
+                         slot. The notEqual below is the path back to Wi-Fi or DND, and it must not
+                         win the empty or airplane cases or the glyph flashes on the way out. -->
+                    <StateTransition stateToId="0:205" duration="0">
+                        <TransitionViewModelCondition opValue="equal">
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyNumber>
+                                    <DataBindContext sourcePathIds="0:60-0:107" propertyKey="636" />
+                                </BindablePropertyNumber>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueNumberComparator value="0" />
+                        </TransitionViewModelCondition>
+                    </StateTransition>
+                    <!-- Airplane while the label is up. The notEqual below exits through NetOut, which
+                         draws the Wi-Fi arcs on the way to the plane. This must win that case. -->
+                    <StateTransition stateToId="0:209" duration="0">
+                        <TransitionViewModelCondition opValue="equal">
+                            <TransitionPropertyViewModelComparator>
+                                <BindablePropertyNumber>
+                                    <DataBindContext sourcePathIds="0:60-0:107" propertyKey="636" />
+                                </BindablePropertyNumber>
+                            </TransitionPropertyViewModelComparator>
+                            <TransitionValueNumberComparator value="2" />
+                        </TransitionViewModelCondition>
+                    </StateTransition>
                     <StateTransition stateToId="0:179" duration="0">
                         <TransitionViewModelCondition opValue="notEqual">
                             <TransitionPropertyViewModelComparator>
@@ -901,6 +1041,22 @@
 
                 <AnimationState x="700" y="140" animationId="0:176" id="0:179">
                     <StateTransition stateToId="0:130" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" />
+                </AnimationState>
+
+                <AnimationState x="800" y="0" animationId="0:202" id="0:204">
+                    <StateTransition stateToId="0:178" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" />
+                </AnimationState>
+
+                <AnimationState x="800" y="140" animationId="0:203" id="0:205">
+                    <StateTransition stateToId="0:131" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" />
+                </AnimationState>
+
+                <AnimationState x="900" y="0" animationId="0:206" id="0:208">
+                    <StateTransition stateToId="0:132" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" />
+                </AnimationState>
+
+                <AnimationState x="900" y="140" animationId="0:207" id="0:209">
+                    <StateTransition stateToId="0:132" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100" />
                 </AnimationState>
             </StateMachineLayer>
             <!-- Charge: independent of Body and MiddleSlot, because charging is orthogonal to both - a
@@ -1483,6 +1639,19 @@
                     <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
                 </KeyedProperty>
             </KeyedObject>
+            <!-- The generation label is part of this pose. Left unkeyed, a jump here from the label
+                 kept the text box up after the glyphs were gone. -->
+            <KeyedObject objectId="0:170">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
         </LinearAnimation>
 
         <LinearAnimation duration="1" name="MiddleWifi" id="0:121" loopValue="loop">
@@ -1572,6 +1741,18 @@
                     <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
                 </KeyedProperty>
                 <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <!-- Same reason as MiddleOff: a jump here from the generation must not leave the label up. -->
+            <KeyedObject objectId="0:170">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
                     <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
                 </KeyedProperty>
             </KeyedObject>
@@ -2096,6 +2277,245 @@
                 </KeyedProperty>
             </KeyedObject>
         </LinearAnimation>
+
+        <!-- Empty slot -> the cellular generation. Same label rise as NetIn, without ever drawing the
+             Wi-Fi glyph: that entrance is for when Wi-Fi was actually showing. -->
+        <LinearAnimation duration="18" name="NetInFromOff" id="0:202">
+            <KeyedObject objectId="0:110">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:111">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:16">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:170">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="12" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0.7" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.22" y1="1" x2="0.36" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="16" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0.7" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.22" y1="1" x2="0.36" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="16" />
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <!-- The cellular generation -> empty. The label drops away and the slot stays empty: bringing
+             the Wi-Fi arcs back here is what flashed the glyph when mobile data was switched off. -->
+        <LinearAnimation duration="12" name="NetOutToOff" id="0:203">
+            <KeyedObject objectId="0:110">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:111">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:16">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:170">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="1" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.64" y1="0" x2="0.78" y2="0" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="10" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="1" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.64" y1="0" x2="0.78" y2="0" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="10" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="1" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.64" y1="0" x2="0.78" y2="0" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="10" />
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <!-- Empty slot -> airplane. PlaneMorph starts from the Wi-Fi pose, so playing it here drew
+             the glyph for a frame and then never ran at all: MiddleOff had no edge to the plane.
+             The arcs and the dot stay retracted; the plane grows out of the empty slot. -->
+        <LinearAnimation duration="27" name="PlaneInFromOff" id="0:206">
+            <KeyedObject objectId="0:110">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:111">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:16">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:170">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:52">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:51">
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.34" y1="1.56" x2="0.64" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="25" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.34" y1="1.56" x2="0.64" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="25" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="18" />
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <!-- Cellular generation -> airplane. NetOut brings the Wi-Fi arcs back and then the plane
+             morphs out of them, which flashed the glyph when airplane mode was switched on from
+             mobile data. The label drops away and the plane grows in its place; the arcs stay down. -->
+        <LinearAnimation duration="27" name="NetToPlane" id="0:207">
+            <KeyedObject objectId="0:110">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:111">
+                <KeyedProperty propertyKey="115">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="116">
+                    <KeyFrameDouble value="0.5" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:16">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:52">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="0" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:170">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="1" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.64" y1="0" x2="0.78" y2="0" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="10" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="1" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.64" y1="0" x2="0.78" y2="0" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="10" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="1" interpolationType="cubic" frame="0">
+                        <CubicEaseInterpolator x1="0.64" y1="0" x2="0.78" y2="0" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="0" interpolationType="hold" frame="10" />
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:51">
+                <KeyedProperty propertyKey="16">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="6">
+                        <CubicEaseInterpolator x1="0.34" y1="1.56" x2="0.64" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="25" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="17">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="6">
+                        <CubicEaseInterpolator x1="0.34" y1="1.56" x2="0.64" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="25" />
+                </KeyedProperty>
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="cubic" frame="6">
+                        <CubicEaseInterpolator x1="0" y1="0" x2="0.58" y2="1" />
+                    </KeyFrameDouble>
+                    <KeyFrameDouble value="1" interpolationType="hold" frame="18" />
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
     </Artboard>
 
     <!-- Font for the digits. Montserrat (OFL) ships with the Rive CLI samples; the final build will
@@ -2172,6 +2592,29 @@
              the left grows to the whole drawn arc and the right shrinks to nothing. -->
         <ViewModelPropertyNumber name="leftArc" id="0:88" />
         <ViewModelPropertyNumber name="rightArc" id="0:89" />
+        <!-- Download wash. Ends are arc lengths; offsets are where each window starts. Opacity 0
+             hides it, which is the idle ring. -->
+        <ViewModelPropertyNumber name="downloadLeftEnd" id="0:212" />
+        <ViewModelPropertyNumber name="downloadLeftOffset" id="0:213" />
+        <ViewModelPropertyNumber name="downloadRightEnd" id="0:214" />
+        <ViewModelPropertyNumber name="downloadRightOffset" id="0:215" />
+        <ViewModelPropertyNumber name="downloadOpacity" id="0:216" />
+        <ViewModelPropertyColor name="downloadColor" id="0:217" />
+        <ViewModelPropertyNumber name="downloadGradientOpacity" id="0:220" />
+        <ViewModelPropertyColor name="downloadGradientColor1" id="0:221" />
+        <ViewModelPropertyColor name="downloadGradientColor2" id="0:222" />
+        <ViewModelPropertyColor name="downloadGradientColor3" id="0:223" />
+        <ViewModelPropertyColor name="downloadGradientColor4" id="0:224" />
+        <ViewModelPropertyColor name="downloadGradientColor5" id="0:225" />
+        <ViewModelPropertyNumber name="downloadGradientStop1" id="0:226" />
+        <ViewModelPropertyNumber name="downloadGradientStop2" id="0:227" />
+        <ViewModelPropertyNumber name="downloadGradientStop3" id="0:228" />
+        <ViewModelPropertyNumber name="downloadGradientStop4" id="0:229" />
+        <ViewModelPropertyNumber name="downloadGradientStop5" id="0:230" />
+        <ViewModelPropertyNumber name="downloadGradientStartX" id="0:231" />
+        <ViewModelPropertyNumber name="downloadGradientStartY" id="0:232" />
+        <ViewModelPropertyNumber name="downloadGradientEndX" id="0:233" />
+        <ViewModelPropertyNumber name="downloadGradientEndY" id="0:234" />
 
         <ViewModelInstance exports="true" name="Default" id="0:61">
             <ViewModelInstanceNumber viewModelPropertyId="0:62" propertyValue="0.9010" />
@@ -2215,6 +2658,27 @@
             <ViewModelInstanceNumber viewModelPropertyId="0:87" propertyValue="0" />
             <ViewModelInstanceNumber viewModelPropertyId="0:88" propertyValue="0.2379" />
             <ViewModelInstanceNumber viewModelPropertyId="0:89" propertyValue="0.2379" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:212" propertyValue="0" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:213" propertyValue="0.6631" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:214" propertyValue="0" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:215" propertyValue="0.0990" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:216" propertyValue="0" />
+            <ViewModelInstanceColor viewModelPropertyId="0:217" propertyValue="FF0A84FF" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:220" propertyValue="0" />
+            <ViewModelInstanceColor viewModelPropertyId="0:221" propertyValue="FF0A84FF" />
+            <ViewModelInstanceColor viewModelPropertyId="0:222" propertyValue="FF00BCD4" />
+            <ViewModelInstanceColor viewModelPropertyId="0:223" propertyValue="FF00BCD4" />
+            <ViewModelInstanceColor viewModelPropertyId="0:224" propertyValue="FF00BCD4" />
+            <ViewModelInstanceColor viewModelPropertyId="0:225" propertyValue="FF00BCD4" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:226" propertyValue="0" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:227" propertyValue="1" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:228" propertyValue="1" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:229" propertyValue="1" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:230" propertyValue="1" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:231" propertyValue="-51.5" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:232" propertyValue="0" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:233" propertyValue="51.5" />
+            <ViewModelInstanceNumber viewModelPropertyId="0:234" propertyValue="0" />
         </ViewModelInstance>
     </ViewModel>
 

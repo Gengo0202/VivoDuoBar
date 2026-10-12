@@ -2,9 +2,11 @@ package io.github.kvmy666.duostatusbar.hook
 
 import android.content.Context
 import android.os.Build
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import io.github.kvmy666.duostatusbar.L
 import io.github.kvmy666.duostatusbar.hook.rom.RomDetection
@@ -31,8 +33,42 @@ import io.github.kvmy666.duostatusbar.hook.rom.RomResources
  */
 internal class DuoIconHost(private val context: Context) {
 
-    /** Where the element view is actually added. Usually the strip; see [overlay]. */
+    /** Where the element view is actually added. Usually the strip; the lock frame when the ring is pinned. */
     private var host: ViewGroup? = null
+
+    /**
+     * Where the ring lives while it follows the icon strip. [host] moves to the status bar when the ring
+     * is locked; this stays the strip (or the overlay frame) so the ring can come back.
+     */
+    private var flowHost: ViewGroup? = null
+
+    /** The status-bar frame the locked ring is centered in. Null while the ring follows the strip. */
+    private var lockFrame: FrameLayout? = null
+
+    /**
+     * True once a lock was attempted against a measured bar. Stops the layout listener from retrying
+     * a missing frame on every clock tick.
+     */
+    private var lockAttempted = false
+
+    /** Stops a strip repair from re-entering itself when adding the spacer requests a layout. */
+    private var repairing = false
+
+    /** True while the ring is being moved onto the status bar, so a layout pass cannot re-attach it halfway. */
+    private var holding = false
+
+    /**
+     * Holds the strip space the ring used to occupy, so sound and vibrate stay put while the ring
+     * itself is drawn on the center of the screen. Null in overlay mode, where the ring never took a slot.
+     */
+    private var ringSpacer: View? = null
+
+    /**
+     * The middle slot last given a strip margin. -1 until the first snapshot, so the first real
+     * occupant still gets a layout pass.
+     */
+    private var laidOutMiddle = -1
+
     private var root: View? = null
     private var element: DuoElement? = null
 
@@ -172,8 +208,12 @@ internal class DuoIconHost(private val context: Context) {
     /** Restyles the status-bar clock and remembers its original so switching off restores it. */
     private val clock = ClockFontController(context, rom)
 
-    /** The element's own tap gestures (FR-05/18), driven from the status-bar touch hook. */
-    private val gestures = ElementGestures(context)
+    /** Ring and detached-icon gestures are independent while split mode is on. */
+    private val ringGestures = ElementGestures(context) { handleDownloadRingTap() }
+    private val indicatorGestures = ElementGestures(context)
+    private var downloadTapActive = false
+    private var onDownloadRingTap: (() -> Unit)? = null
+    private var touchPart: DuoPart? = null
 
     val duo: DuoElement? get() = element
 
@@ -182,10 +222,31 @@ internal class DuoIconHost(private val context: Context) {
         listOfNotNull(element, indicators) + extras.flatMap { listOfNotNull(it.element, it.indicators) }
 
     /** Views this module added, so a hiding pass never treats them as stock icons. */
-    private fun ourViews(): List<View> = allElements().map { it.ui }
+    private fun ourViews(): List<View> = allElements().map { it.ui } + listOfNotNull(ringSpacer)
+
+    /** The ring is pinned to the status bar only while the icons are drawn beside it. */
+    private fun ringLocked(): Boolean = settings.splitIndicators && settings.lockRing
+
+    /**
+     * Where the icon cluster is added. Locked mode keeps it in the strip, so it still slides with the
+     * clock; the ring is the view that leaves. Overlay mode has no strip slot, so the cluster stays
+     * with the ring's frame and is anchored on the battery as before.
+     */
+    private fun clusterHome(): ViewGroup? = when {
+        ringLocked() && !overlay -> hideStrip ?: flowHost ?: host
+        else -> host
+    }
 
     /** Pushes a snapshot at every element that is drawing, in every bar. */
     fun render(v: DuoVisual) {
+        if (v.middleMode != laidOutMiddle) {
+            laidOutMiddle = v.middleMode
+            // Margins only. A full relayout here would re-seat a centered ring, and resizing the Rive
+            // view is what used to take System UI down. The icon's padding is a margin, not a new size.
+            applyMiddleSlotSpace()
+            syncIndicators()
+            for (slot in extras) syncExtraIndicators(slot)
+        }
         for (target in allElements()) {
             try {
                 target.render(v)
@@ -418,7 +479,7 @@ internal class DuoIconHost(private val context: Context) {
         val view = slot.element?.ui ?: return
         try {
             val side = geometry.sidePx(target, slot.bar, slot.basePx)
-            assignBox(view, target, side, edgeInsetPx(side, settings.edgePadding))
+            assignBox(view, target, side, ringInset(side))
             place(view, target, slot.bar, side, settings.offsetX, slot.center)
         } catch (t: Throwable) {
             L.w("${slot.name} layout: ${t.message}")
@@ -519,7 +580,7 @@ internal class DuoIconHost(private val context: Context) {
         if (changed) {
             L.i("settings rev ${fresh.revision}: size ${fresh.sizePercent}%, offset ${fresh.offsetX}dp, " +
                     "percent=${fresh.showPercent}, percentHeight=${fresh.percentHeight}%, " +
-                    "split=${fresh.splitIndicators}, icons=${fresh.indicatorsOffsetX}dp, " +
+                    "split=${fresh.splitIndicators}, lock=${fresh.lockRing}, icons=${fresh.indicatorsOffsetX}dp, " +
                     "edge=${fresh.edgePadding}%, " +
                     "rive=${fresh.useRive}, live=${fresh.liveApply}"
             )
@@ -536,7 +597,7 @@ internal class DuoIconHost(private val context: Context) {
             } else {
                 // The safe path: size and position are saved but wait for the next start. Gestures and
                 // the clock's font are not geometry, so they can still change live.
-                element?.ui?.let { gestures.install(it, settings.tapAction, settings.doubleTapAction, settings.longPressAction) }
+                installAllGestures()
                 L.i("live apply off - size/position take effect after Restart System UI")
             }
             clock.apply(root, settings.systemClockFont)
@@ -560,20 +621,198 @@ internal class DuoIconHost(private val context: Context) {
 
     /** Size and offset come from the settings, so reshaping the element needs no re-injection (FR-03/17). */
     private fun applyLayout() {
-        val target = host ?: return
         val view = element?.ui ?: return
+        val measureFrom = hideStrip ?: host ?: return
         try {
-            val side = geometry.sidePx(target, root)
+            val side = geometry.sidePx(measureFrom, root)
             // assignBox only rewrites layoutParams when the box actually changed. Re-assigning them
             // (even to the same numbers) requests a layout pass, and a layout pass on the Rive
             // TextureView is what took System UI down on rotation.
-            assignBox(view, target, side, edgeInsetPx(side, settings.edgePadding))
-            place(view, target, root, side, settings.offsetX, center = true)
-            installGestures(view)
-            indicators?.ui?.let { installGestures(it) }
+            if (!ringLocked() || !holdRing(view, side)) {
+                releaseRing(view)
+                val target = host ?: return
+                assignBox(view, target, side, ringInset(side))
+                place(view, target, root, side, settings.offsetX, center = true)
+            }
+            installRingGestures(view)
+            indicators?.ui?.let { installIndicatorGestures(it) }
         } catch (t: Throwable) {
             L.w("applyLayout: ${t.message}")
         }
+    }
+
+    /**
+     * Centers the ring in the status bar and leaves a spacer in the strip.
+     *
+     * The translation is written once, from the bar's own center. Nothing on the clock tick reads it
+     * back: the bar does not move when the clock gets wider, so the ring does not either.
+     * Returns false when that frame is not available yet, and the caller leaves the ring in the strip.
+     */
+    private fun holdRing(view: View, side: Int): Boolean {
+        val barRoot = root ?: return false
+        val strip = hideStrip
+        holding = true
+        try {
+            return holdRingNow(view, side, barRoot, strip)
+        } finally {
+            holding = false
+        }
+    }
+
+    private fun holdRingNow(view: View, side: Int, barRoot: View, strip: ViewGroup?): Boolean {
+        val frame = finder.findLockFrame(strip ?: view, barRoot)
+        if (frame == null) {
+            if (barRoot.width > 0) {
+                lockAttempted = true
+                logOnce.once("lock-frame") {
+                    L.w("lock ring: no full-width status bar frame - the ring stays in the icon strip")
+                }
+            }
+            return false
+        }
+        lockFrame = frame
+        lockAttempted = true
+        host = frame
+        allowOverflow(frame)
+        if (view.parent !== frame) {
+            (view.parent as? ViewGroup)?.removeView(view)
+            assignLockedBox(view, side)
+            frame.addView(view)
+        } else {
+            assignLockedBox(view, side)
+        }
+        if (overlay) dropSpacer() else strip?.let { ensureSpacer(it, side) }
+        placeLocked(view, frame, side, settings.offsetX)
+        logOnce.once("lock-on") {
+            L.i("ring locked to ${frame.javaClass.simpleName} ${frame.width}x${frame.height}")
+        }
+        return true
+    }
+
+    /** Puts the ring back in the icon strip and removes the spacer that was holding its slot. */
+    private fun releaseRing(view: View) {
+        dropSpacer()
+        lockFrame = null
+        // A failed lock while the switch is still on must keep [lockAttempted], or the clock-tick
+        // listener would retry the move forever. Turning the lock off is what clears it.
+        if (!ringLocked()) lockAttempted = false
+        val parent = flowHost ?: hideStrip ?: host ?: return
+        if (view.parent !== parent) {
+            (view.parent as? ViewGroup)?.removeView(view)
+            parent.addView(view)
+        }
+        host = parent
+        flowHost = parent
+    }
+
+    /** Top-left gravity, so the locked translation is measured from a stable edge in both LTR and RTL. */
+    private fun assignLockedBox(view: View, side: Int) {
+        val height = RingGeometry.elementHeightPx(side)
+        val gravity = Gravity.LEFT or Gravity.TOP
+        val lp = view.layoutParams as? FrameLayout.LayoutParams
+        if (lp != null && lp.width == side && lp.height == height && lp.gravity == gravity &&
+            lp.leftMargin == 0 && lp.rightMargin == 0 && lp.topMargin == 0 && lp.bottomMargin == 0
+        ) return
+        view.layoutParams = FrameLayout.LayoutParams(side, height).apply { this.gravity = gravity }
+    }
+
+    private fun placeLocked(view: View, frame: FrameLayout, side: Int, offsetDp: Int) {
+        if (frame.width <= 0 || frame.height <= 0) return
+        val density = context.resources.displayMetrics.density
+        view.translationX = lockedTranslationX(
+            0, frame.width, 0, frame.paddingLeft, side, offsetDp * density
+        )
+        view.translationY = lockedTranslationY(
+            0, frame.height, 0, frame.paddingTop, side
+        )
+    }
+
+    /** An invisible slot with the ring's width and edge inset, inserted ahead of the icon cluster. */
+    private fun ensureSpacer(strip: ViewGroup, side: Int) {
+        val spacer = ringSpacer ?: View(context).also { created ->
+            created.visibility = View.INVISIBLE
+            created.isClickable = false
+            created.isFocusable = false
+            created.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            ringSpacer = created
+        }
+        if (spacer.parent !== strip) {
+            (spacer.parent as? ViewGroup)?.removeView(spacer)
+            val cluster = indicators?.ui
+            val index = if (cluster != null && cluster.parent === strip) strip.indexOfChild(cluster) else -1
+            if (index >= 0) strip.addView(spacer, index) else strip.addView(spacer)
+        }
+        assignBox(spacer, strip, side, iconSlotInset(side))
+    }
+
+    /**
+     * Updates the strip margin for the current middle occupant, without moving or resizing the ring.
+     */
+    private fun applyMiddleSlotSpace() {
+        try {
+            val measureFrom = hideStrip ?: host
+            val main = element?.ui
+            if (measureFrom != null && main != null) {
+                val side = geometry.sidePx(measureFrom, root)
+                if (ringLocked()) hideStrip?.let { ensureSpacer(it, side) }
+                else host?.let { assignBox(main, it, side, ringInset(side)) }
+            }
+            for (slot in extras) {
+                val target = slot.container ?: continue
+                val view = slot.element?.ui ?: continue
+                val side = geometry.sidePx(target, slot.bar, slot.basePx)
+                assignBox(view, target, side, ringInset(side))
+            }
+        } catch (t: Throwable) {
+            L.w("middle slot space: ${t.message}")
+        }
+    }
+
+    /**
+     * The ring's own strip margin.
+     *
+     * With a middle icon showing, this is the edge-spacing setting. With the slot empty, the margin
+     * outside the ring's ink is handed back as well: that padding belonged to the icon.
+     */
+    private fun ringInset(side: Int): Int {
+        val base = edgeInsetPx(side, settings.edgePadding)
+        return if (middleSlotEmpty()) base - RingGeometry.outerSlackPx(side) else base
+    }
+
+    /**
+     * The spacer left in the strip while the ring is centered.
+     *
+     * It exists to hold the middle icon. An empty slot keeps none of it, so the other status icons
+     * close up instead of sitting beside a blank gap. A visible icon keeps the edge-spacing setting.
+     */
+    private fun iconSlotInset(side: Int): Int =
+        edgeInsetPx(side, if (middleSlotEmpty()) 0 else settings.edgePadding)
+
+    private fun middleSlotEmpty(): Boolean = laidOutMiddle == DuoMapping.MIDDLE_OFF
+
+    /** Keeps the cluster drawing where it was after the spacer stops reserving width. */
+    private fun holdIconSlot(view: View, container: ViewGroup, side: Int) {
+        val hold = iconSlotHoldPx(side)
+        if (hold == 0) return
+        val rtl = container.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        view.translationX += if (rtl) -hold else hold
+    }
+
+    /**
+     * How far the icon cluster has to slide to stay put when [iconSlotInset] stops reserving the spacer.
+     *
+     * The cluster is the next child after the spacer and overlaps it with a negative margin. Collapsing
+     * the spacer moves that child by the width that was reserved; this puts the drawing back.
+     */
+    private fun iconSlotHoldPx(side: Int): Int {
+        if (!middleSlotEmpty() || ringSpacer?.parent == null) return 0
+        return side * settings.edgePadding.coerceIn(0, 100) / 100
+    }
+
+    private fun dropSpacer() {
+        val spacer = ringSpacer ?: return
+        (spacer.parent as? ViewGroup)?.removeView(spacer)
+        ringSpacer = null
     }
 
     /**
@@ -609,8 +848,46 @@ internal class DuoIconHost(private val context: Context) {
             RingGeometry.ringAnchorShiftY(side)
     }
 
-    private fun installGestures(view: View) {
-        gestures.install(view, settings.tapAction, settings.doubleTapAction, settings.longPressAction)
+    private fun installRingGestures(view: View) {
+        ringGestures.install(
+            view,
+            settings.tapAction,
+            settings.doubleTapAction,
+            settings.longPressAction,
+            singleTapOverrideActive = downloadTapActive
+        )
+    }
+
+    private fun installIndicatorGestures(view: View) {
+        indicatorGestures.install(
+            view,
+            settings.indicatorsTapAction,
+            settings.indicatorsDoubleTapAction,
+            settings.indicatorsLongPressAction
+        )
+    }
+
+    private fun installAllGestures() {
+        element?.ui?.let(::installRingGestures)
+        indicators?.ui?.let(::installIndicatorGestures)
+        for (slot in extras) {
+            slot.element?.ui?.let(::installRingGestures)
+            slot.indicators?.ui?.let(::installIndicatorGestures)
+        }
+    }
+
+    /** While a download is visible, a ring single-tap belongs to the battery/download toggle. */
+    fun setDownloadTap(active: Boolean, onTap: () -> Unit) {
+        onDownloadRingTap = onTap
+        if (downloadTapActive == active) return
+        downloadTapActive = active
+        installAllGestures()
+    }
+
+    private fun handleDownloadRingTap(): Boolean {
+        if (!downloadTapActive) return false
+        onDownloadRingTap?.invoke() ?: return false
+        return true
     }
 
     /** The part the ring's view should draw for the current settings. */
@@ -623,7 +900,7 @@ internal class DuoIconHost(private val context: Context) {
      */
     private fun syncIndicators() {
         val ring = element ?: return
-        val container = host ?: return
+        val container = clusterHome() ?: return
         ring.part = ringPart()
         if (!settings.splitIndicators) {
             drop(indicators, container)
@@ -680,8 +957,10 @@ internal class DuoIconHost(private val context: Context) {
     ): DuoElement? {
         val side = geometry.sidePx(container, windowRoot, basePx)
         existing?.let { cluster ->
+            seatBeside(cluster.ui, container, ringView)
             place(cluster.ui, container, windowRoot, side, settings.indicatorsOffsetX, center)
-            installGestures(cluster.ui)
+            holdIconSlot(cluster.ui, container, side)
+            installIndicatorGestures(cluster.ui)
             return cluster
         }
         val stage = guard.stage()
@@ -698,7 +977,8 @@ internal class DuoIconHost(private val context: Context) {
         assign(candidate)
         allowOverflow(container)
         place(candidate.ui, container, windowRoot, side, settings.indicatorsOffsetX, center)
-        installGestures(candidate.ui)
+        holdIconSlot(candidate.ui, container, side)
+        installIndicatorGestures(candidate.ui)
         candidate.onReady {
             candidate.reveal(settings.revealMs)
             L.i("icon cluster injected (${side}px, offset ${settings.indicatorsOffsetX}dp)")
@@ -716,7 +996,7 @@ internal class DuoIconHost(private val context: Context) {
             swap(container, candidate, canvas, ringView)
             assign(canvas)
             place(canvas.ui, container, windowRoot, side, settings.indicatorsOffsetX, center)
-            installGestures(canvas.ui)
+            installIndicatorGestures(canvas.ui)
             canvas.onReady { canvas.reveal(settings.revealMs) }
         }
         return candidate
@@ -737,10 +1017,27 @@ internal class DuoIconHost(private val context: Context) {
         else container.addView(to.ui)
     }
 
+    /**
+     * Puts [view] in [container], directly after [ringView] when the ring is in that container.
+     * A ring that lives in the lock frame is not a child here, and an already-seated cluster is left
+     * alone so a settings refresh does not request another layout pass.
+     */
+    private fun seatBeside(view: View, container: ViewGroup, ringView: View) {
+        val ringHere = container.indexOfChild(ringView)
+        if (view.parent === container) {
+            if (ringHere < 0 || container.indexOfChild(view) == ringHere + 1) return
+            container.removeView(view)
+            container.addView(view, ringHere + 1)
+            return
+        }
+        (view.parent as? ViewGroup)?.removeView(view)
+        if (ringHere >= 0) container.addView(view, ringHere + 1) else container.addView(view)
+    }
+
     private fun drop(view: DuoElement?, container: ViewGroup?) {
         view ?: return
         try {
-            container?.removeView(view.ui)
+            (view.ui.parent as? ViewGroup ?: container)?.removeView(view.ui)
             view.teardown()
         } catch (_: Throwable) {
         }
@@ -762,8 +1059,38 @@ internal class DuoIconHost(private val context: Context) {
      * Called from a `dispatchTouchEvent` hook on the status bar, above the point where the bar swallows
      * touches, because the injected view never receives them. See [ElementGestures.handle].
      */
-    fun handleElementTouch(event: MotionEvent): Boolean =
-        gestures.handle(event, listOfNotNull(element?.ui, indicators?.ui))
+    fun handleElementTouch(event: MotionEvent): Boolean {
+        val ringViews = listOfNotNull(element?.ui)
+        val indicatorViews = listOfNotNull(indicators?.ui)
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            // The two views can overlap at their transparent artboard edges. The detached icon view
+            // is visually on top, so it owns that overlap and a ring action cannot also run there.
+            touchPart = when {
+                settings.splitIndicators && indicatorGestures.contains(
+                    event,
+                    indicatorViews,
+                    ElementGestures.HitRegion.INDICATORS
+                ) ->
+                    DuoPart.INDICATORS
+                ringGestures.contains(
+                    event,
+                    ringViews,
+                    if (settings.splitIndicators) ElementGestures.HitRegion.RING
+                    else ElementGestures.HitRegion.VIEW
+                ) -> DuoPart.RING
+                else -> null
+            }
+        }
+        val handled = when (touchPart) {
+            DuoPart.INDICATORS -> indicatorGestures.handle(event, indicatorViews)
+            DuoPart.RING -> ringGestures.handle(event, ringViews)
+            else -> false
+        }
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            touchPart = null
+        }
+        return handled
+    }
 
     /**
      * Finds `system_icons`, injects the Duo element, hides what it replaces. True on success.
@@ -850,6 +1177,7 @@ internal class DuoIconHost(private val context: Context) {
             candidate.ui.layoutParams = layoutParamsFor(container, side)
             container.addView(candidate.ui)
             host = container
+            flowHost = container
             element = candidate
             applyLayout()
             syncIndicators()
@@ -875,7 +1203,7 @@ internal class DuoIconHost(private val context: Context) {
             // battery keeps its layout instead so the anchor stays valid (and survives rotation).
             hideStock(
                 target,
-                if (overlay) null else candidate.ui,
+                if (candidate.ui.parent === target) candidate.ui else null,
                 if (overlay) anchorBattery else null
             )
             hideOverlayAnchor()
@@ -999,9 +1327,10 @@ internal class DuoIconHost(private val context: Context) {
         }
         try {
             // Hide in the strip, never in the element's own (overlay) parent.
+            val ring = element?.ui
             hideStock(
                 strip,
-                if (overlay) null else element?.ui,
+                if (ring != null && ring.parent === strip) ring else null,
                 if (overlay) anchorBattery else null
             )
             hideOverlayAnchor()
@@ -1017,9 +1346,27 @@ internal class DuoIconHost(private val context: Context) {
      * is re-attached first, and if that is not possible the caller is told to put the stock icons back.
      */
     private fun ensureElementAttached(): Boolean {
+        if (holding || repairing) return true
         val view = element?.ui ?: return true
         val target = host ?: return false
-        if (view.parent === target && view.isAttachedToWindow) return true
+        val iconsDetached = indicators != null &&
+            (indicators?.ui?.parent == null || indicators?.ui?.isAttachedToWindow == false)
+        val spacerDetached = ringSpacer != null &&
+            (ringSpacer?.parent == null || ringSpacer?.isAttachedToWindow == false)
+        if (view.parent === target && view.isAttachedToWindow && !iconsDetached && !spacerDetached) {
+            // The bar may not have been measured at attach. One retry, after it has a width, and then
+            // stop: the layout listener runs on every clock tick and must not move the ring again.
+            val bar = root
+            if (ringLocked() && lockFrame == null && !lockAttempted && bar != null && bar.width > 0) {
+                lockAttempted = true
+                view.post { if (ringLocked() && lockFrame == null) applyLayout() }
+            }
+            return true
+        }
+        if (view.parent === target && view.isAttachedToWindow && (iconsDetached || spacerDetached)) {
+            repairStrip()
+            return true
+        }
         return try {
             (view.parent as? ViewGroup)?.removeView(view)
             val barRoot = root
@@ -1045,6 +1392,7 @@ internal class DuoIconHost(private val context: Context) {
                 else -> fresh
             }
             host = parent
+            flowHost = parent
             parent.addView(view)
             indicators?.ui?.let { icon ->
                 (icon.parent as? ViewGroup)?.removeView(icon)
@@ -1058,6 +1406,34 @@ internal class DuoIconHost(private val context: Context) {
         } catch (t: Throwable) {
             L.w("re-attach failed: ${t.javaClass.simpleName}: ${t.message}")
             false
+        }
+    }
+
+    /**
+     * The locked ring stays on the status bar when the icon strip is rebuilt. Only the spacer and the
+     * icon cluster lived in that strip, so they are put back and the ring's translation is left alone.
+     */
+    private fun repairStrip() {
+        if (repairing) return
+        repairing = true
+        try {
+            val barRoot = root ?: return
+            val fresh = finder.findStatusIconsHost(barRoot) ?: return
+            if (!fresh.isAttachedToWindow) return
+            hideStrip = fresh
+            if (!overlay) flowHost = fresh
+            if (ringLocked() && !overlay) ensureSpacer(fresh, geometry.sidePx(fresh, barRoot))
+            val icons = indicators
+            if (icons != null && (icons.ui.parent == null || !icons.ui.isAttachedToWindow)) {
+                try {
+                    icons.teardown()
+                } catch (_: Throwable) {
+                }
+                indicators = null
+            }
+            syncIndicators()
+        } finally {
+            repairing = false
         }
     }
 
@@ -1081,6 +1457,7 @@ internal class DuoIconHost(private val context: Context) {
             }
         }
         extras.clear()
+        dropSpacer()
         element = null
         hider.restore()
         // The One UI 8 anchor is hidden directly (it is not in the strip the hider restores), so its own
@@ -1097,6 +1474,11 @@ internal class DuoIconHost(private val context: Context) {
         overlayOnCombined = false
         anchorBattery = null
         anchorOriginalVisibility = null
+        flowHost = null
+        lockFrame = null
+        lockAttempted = false
+        repairing = false
+        holding = false
         root = null
     }
 

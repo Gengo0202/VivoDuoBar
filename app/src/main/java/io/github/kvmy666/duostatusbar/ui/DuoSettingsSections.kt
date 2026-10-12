@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +52,7 @@ internal fun CustomizeSection(
     matches: SearchGate,
     onRestart: () -> Unit
 ) {
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.coerceAtLeast(1)
     if (matches(
             stringResource(R.string.section_customize), stringResource(R.string.section_element),
             stringResource(R.string.settings_master),
@@ -60,6 +62,8 @@ internal fun CustomizeSection(
             stringResource(R.string.settings_percent_height_detail),
             stringResource(R.string.settings_split),
             stringResource(R.string.settings_split_detail),
+            stringResource(R.string.settings_lock_ring),
+            stringResource(R.string.settings_lock_ring_detail),
             stringResource(R.string.settings_indicators_position),
             stringResource(R.string.settings_edge_padding),
             stringResource(R.string.settings_edge_padding_detail),
@@ -176,11 +180,44 @@ internal fun CustomizeSection(
                 enabled = settings.enabled
             ) { onUpdate(settings.copy(liveApply = it)) }
 
+            if (settings.splitIndicators) {
+                SettingSwitch(
+                    label = stringResource(R.string.settings_lock_ring),
+                    detail = stringResource(R.string.settings_lock_ring_detail),
+                    checked = settings.lockRing,
+                    enabled = settings.enabled
+                ) { locked ->
+                    onUpdate(
+                        settings.copy(
+                            lockRing = locked,
+                            offsetX = if (locked) {
+                                settings.offsetX
+                            } else {
+                                settings.offsetX.coerceIn(
+                                    -DuoPrefs.MAX_UNLOCKED_RING_OFFSET,
+                                    DuoPrefs.MAX_UNLOCKED_RING_OFFSET
+                                )
+                            }
+                        )
+                    )
+                }
+            }
             PositionEditor(
                 offsetDp = settings.offsetX,
+                maxOffsetDp = if (settings.splitIndicators && settings.lockRing) {
+                    positionOffsetLimit(screenWidthDp, centered = true)
+                } else {
+                    DuoPrefs.MAX_UNLOCKED_RING_OFFSET
+                },
                 enabled = settings.enabled,
+                centered = settings.splitIndicators && settings.lockRing,
                 label = if (settings.splitIndicators) stringResource(R.string.settings_ring_position) else null,
-                hint = if (settings.splitIndicators) stringResource(R.string.settings_ring_position_hint) else null,
+                hint = when {
+                    settings.splitIndicators && settings.lockRing ->
+                        stringResource(R.string.settings_ring_position_locked_hint)
+                    settings.splitIndicators -> stringResource(R.string.settings_ring_position_hint)
+                    else -> null
+                },
                 visual = if (settings.splitIndicators) {
                     DuoPart.RING.apply(demo())
                 } else {
@@ -190,6 +227,7 @@ internal fun CustomizeSection(
             if (settings.splitIndicators) {
                 PositionEditor(
                     offsetDp = settings.indicatorsOffsetX,
+                    maxOffsetDp = DuoPrefs.MAX_INDICATORS_OFFSET,
                     enabled = settings.enabled,
                     label = stringResource(R.string.settings_indicators_position),
                     hint = stringResource(R.string.settings_indicators_position_hint),
@@ -482,6 +520,12 @@ internal fun ActionsSection(
                 },
                 style = MaterialTheme.typography.bodySmall
             )
+            if (settings.splitIndicators) {
+                Text(
+                    text = stringResource(R.string.settings_ring_actions),
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
             ActionPicker(
                 label = stringResource(R.string.settings_tap),
                 selectedKey = settings.tapAction,
@@ -497,6 +541,31 @@ internal fun ActionsSection(
                 selectedKey = settings.longPressAction,
                 enabled = autoExpand && settings.enabled
             ) { onUpdate(settings.copy(longPressAction = it)) }
+            if (settings.splitIndicators) {
+                Text(
+                    text = stringResource(R.string.settings_indicator_actions),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                ActionPicker(
+                    label = stringResource(R.string.settings_tap),
+                    selectedKey = settings.indicatorsTapAction,
+                    enabled = autoExpand && settings.enabled
+                ) { onUpdate(settings.copy(indicatorsTapAction = it)) }
+                ActionPicker(
+                    label = stringResource(R.string.settings_double_tap),
+                    selectedKey = settings.indicatorsDoubleTapAction,
+                    enabled = autoExpand && settings.enabled
+                ) { onUpdate(settings.copy(indicatorsDoubleTapAction = it)) }
+                ActionPicker(
+                    label = stringResource(R.string.settings_long_press),
+                    selectedKey = settings.indicatorsLongPressAction,
+                    enabled = autoExpand && settings.enabled
+                ) { onUpdate(settings.copy(indicatorsLongPressAction = it)) }
+            }
+            Text(
+                text = stringResource(R.string.settings_download_tap_note),
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }

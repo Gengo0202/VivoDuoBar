@@ -37,6 +37,9 @@ internal data class ModuleSettings(
     val tapAction: String,
     val doubleTapAction: String,
     val longPressAction: String,
+    val indicatorsTapAction: String,
+    val indicatorsDoubleTapAction: String,
+    val indicatorsLongPressAction: String,
     val animationsEnabled: Boolean,
     val arrivalEnabled: Boolean,
     val departureEnabled: Boolean,
@@ -62,6 +65,11 @@ internal data class ModuleSettings(
     val splitIndicators: Boolean,
     /** Horizontal nudge for that icon cluster, in dp. The ring keeps [offsetX]. */
     val indicatorsOffsetX: Int,
+    /**
+     * When true with [splitIndicators], the ring is centered on the status bar and [offsetX] nudges
+     * from that center. A wider clock does not move it.
+     */
+    val lockRing: Boolean,
     /**
      * When true, airplane mode turns the four spheres into Wi-Fi strength. They stay cellular
      * while airplane mode is off, and they disappear in airplane mode with Wi-Fi off.
@@ -90,6 +98,9 @@ internal data class ModuleSettings(
             tapAction = "no_action",
             doubleTapAction = "no_action",
             longPressAction = "no_action",
+            indicatorsTapAction = "no_action",
+            indicatorsDoubleTapAction = "no_action",
+            indicatorsLongPressAction = "no_action",
             animationsEnabled = true,
             arrivalEnabled = true,
             departureEnabled = true,
@@ -103,6 +114,7 @@ internal data class ModuleSettings(
             percentHeight = DuoPrefs.DEFAULT_PERCENT_HEIGHT,
             splitIndicators = false,
             indicatorsOffsetX = 0,
+            lockRing = false,
             wifiDots = false,
             edgePadding = DuoPrefs.DEFAULT_EDGE_PADDING
         )
@@ -357,6 +369,18 @@ internal object DuoSettingsClient {
         tapAction = cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_TAP)) ?: "no_action",
         doubleTapAction = cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_DOUBLE_TAP)) ?: "no_action",
         longPressAction = cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_LONG_PRESS)) ?: "no_action",
+        indicatorsTapAction = cursor.optionalString(
+            DuoPrefs.COL_INDICATORS_TAP,
+            cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_TAP)) ?: "no_action"
+        ),
+        indicatorsDoubleTapAction = cursor.optionalString(
+            DuoPrefs.COL_INDICATORS_DOUBLE_TAP,
+            cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_DOUBLE_TAP)) ?: "no_action"
+        ),
+        indicatorsLongPressAction = cursor.optionalString(
+            DuoPrefs.COL_INDICATORS_LONG_PRESS,
+            cursor.getString(cursor.getColumnIndexOrThrow(DuoPrefs.COL_LONG_PRESS)) ?: "no_action"
+        ),
         animationsEnabled = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_ANIMATIONS)) == 1,
         arrivalEnabled = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_ARRIVAL)) == 1,
         departureEnabled = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_DEPARTURE)) == 1,
@@ -379,8 +403,12 @@ internal object DuoSettingsClient {
         percentHeight = cursor.getInt(cursor.getColumnIndexOrThrow(DuoPrefs.COL_PERCENT_HEIGHT))
             .coerceIn(DuoPrefs.MIN_PERCENT_HEIGHT, DuoPrefs.MAX_PERCENT_HEIGHT),
         splitIndicators = cursor.optionalInt(DuoPrefs.COL_SPLIT_INDICATORS) == 1,
-        indicatorsOffsetX = cursor.optionalInt(DuoPrefs.COL_INDICATORS_OFFSET_X)
-            .coerceIn(-DuoPrefs.MAX_OFFSET, DuoPrefs.MAX_OFFSET),
+        indicatorsOffsetX = cursor.optionalInt(DuoPrefs.COL_INDICATORS_OFFSET_X).coerceIn(
+            -DuoPrefs.MAX_INDICATORS_OFFSET,
+            DuoPrefs.MAX_INDICATORS_OFFSET
+        ),
+        // Missing means the ring stays in the strip, so an older settings app cannot pin it by accident.
+        lockRing = cursor.optionalBool(DuoPrefs.COL_LOCK_RING, false),
         // Optional so a settings app that predates this column cannot blank the bar:
         // a missing column is the original cellular dots.
         wifiDots = cursor.optionalInt(DuoPrefs.COL_WIFI_DOTS) == 1,
@@ -429,6 +457,15 @@ internal object DuoSettingsClient {
             tapAction = str(DuoPrefs.COL_TAP, portrait.tapAction),
             doubleTapAction = str(DuoPrefs.COL_DOUBLE_TAP, portrait.doubleTapAction),
             longPressAction = str(DuoPrefs.COL_LONG_PRESS, portrait.longPressAction),
+            indicatorsTapAction = str(DuoPrefs.COL_INDICATORS_TAP, portrait.indicatorsTapAction),
+            indicatorsDoubleTapAction = str(
+                DuoPrefs.COL_INDICATORS_DOUBLE_TAP,
+                portrait.indicatorsDoubleTapAction
+            ),
+            indicatorsLongPressAction = str(
+                DuoPrefs.COL_INDICATORS_LONG_PRESS,
+                portrait.indicatorsLongPressAction
+            ),
             animationsEnabled = bool(DuoPrefs.COL_ANIMATIONS, portrait.animationsEnabled),
             arrivalEnabled = bool(DuoPrefs.COL_ARRIVAL, portrait.arrivalEnabled),
             departureEnabled = bool(DuoPrefs.COL_DEPARTURE, portrait.departureEnabled),
@@ -442,8 +479,11 @@ internal object DuoSettingsClient {
             percentHeight = int(DuoPrefs.COL_PERCENT_HEIGHT, portrait.percentHeight)
                 .coerceIn(DuoPrefs.MIN_PERCENT_HEIGHT, DuoPrefs.MAX_PERCENT_HEIGHT),
             splitIndicators = bool(DuoPrefs.COL_SPLIT_INDICATORS, portrait.splitIndicators),
-            indicatorsOffsetX = int(DuoPrefs.COL_INDICATORS_OFFSET_X, portrait.indicatorsOffsetX)
-                .coerceIn(-DuoPrefs.MAX_OFFSET, DuoPrefs.MAX_OFFSET),
+            indicatorsOffsetX = int(
+                DuoPrefs.COL_INDICATORS_OFFSET_X,
+                portrait.indicatorsOffsetX
+            ).coerceIn(-DuoPrefs.MAX_INDICATORS_OFFSET, DuoPrefs.MAX_INDICATORS_OFFSET),
+            lockRing = bool(DuoPrefs.COL_LOCK_RING, portrait.lockRing),
             wifiDots = bool(DuoPrefs.COL_WIFI_DOTS, portrait.wifiDots),
             edgePadding = int(DuoPrefs.COL_EDGE_PADDING, portrait.edgePadding)
                 .coerceIn(DuoPrefs.MIN_EDGE_PADDING, DuoPrefs.MAX_EDGE_PADDING)

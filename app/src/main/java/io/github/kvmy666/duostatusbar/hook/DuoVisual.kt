@@ -76,6 +76,17 @@ data class DuoVisual(
      * gap - so that whole sequence is one Rive layer, and this is the only thing the host says about it.
      */
     val charging: Boolean,
+    /**
+     * Download stroke on top of the white ring. [downloadOpacity] 0 leaves the battery ring as it
+     * was. Lengths and offsets are trim fractions for the same caps the battery fill uses.
+     */
+    val downloadLeftEnd: Float = 0f,
+    val downloadLeftOffset: Float = RingGeometry.LEFT_START,
+    val downloadRightEnd: Float = 0f,
+    val downloadRightOffset: Float = RingGeometry.RIGHT_START,
+    val downloadOpacity: Float = 0f,
+    val downloadColor: Int = DownloadWash.COLOR,
+    val downloadGradient: DownloadGradient? = null,
     /** False plays the departure (screen off); true brings the element back. */
     val visible: Boolean = true,
     /**
@@ -119,6 +130,13 @@ data class DuoVisual(
             moon3Opacity = at(moon3Opacity, other.moon3Opacity),
             moon4Opacity = at(moon4Opacity, other.moon4Opacity),
             centerMoonOpacity = at(centerMoonOpacity, other.centerMoonOpacity),
+            downloadLeftEnd = at(downloadLeftEnd, other.downloadLeftEnd),
+            downloadLeftOffset = at(downloadLeftOffset, other.downloadLeftOffset),
+            downloadRightEnd = at(downloadRightEnd, other.downloadRightEnd),
+            downloadRightOffset = at(downloadRightOffset, other.downloadRightOffset),
+            downloadOpacity = at(downloadOpacity, other.downloadOpacity),
+            downloadColor = if (past) other.downloadColor else downloadColor,
+            downloadGradient = if (past) other.downloadGradient else downloadGradient,
             percentText = if (past) other.percentText else percentText,
             networkText = if (past) other.networkText else networkText,
             tint = if (past) other.tint else tint,

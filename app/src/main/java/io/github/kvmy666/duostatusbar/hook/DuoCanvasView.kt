@@ -2,9 +2,11 @@ package io.github.kvmy666.duostatusbar.hook
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.SystemClock
 import android.view.View
@@ -169,6 +171,55 @@ internal class DuoCanvasView(
             val rightSweep = visual.trimRightEnd * 360f
             if (rightSweep > MIN_SWEEP) {
                 canvas.drawArc(arcBounds, TRIM_ORIGIN + 360f * DuoMapping.RIGHT_START, rightSweep, false, ring)
+            }
+            // Download wash, on top of the white stroke, from the same caps. Opacity 0 draws nothing.
+            if (visual.downloadOpacity > 0.01f) {
+                val gradient = visual.downloadGradient
+                ring.shader =
+                    gradient?.let {
+                        val points = it.points(
+                            arcBounds.left,
+                            arcBounds.top,
+                            arcBounds.right,
+                            arcBounds.bottom,
+                        )
+                        LinearGradient(
+                            points[0],
+                            points[1],
+                            points[2],
+                            points[3],
+                            it.colors.toIntArray(),
+                            null,
+                            Shader.TileMode.CLAMP,
+                        )
+                    }
+                if (gradient == null) {
+                    ring.color = withAlpha(visual.downloadColor, visual.downloadOpacity)
+                } else {
+                    ring.alpha = (visual.downloadOpacity * 255f).toInt().coerceIn(0, 255)
+                }
+                val downloadLeft = visual.downloadLeftEnd * 360f
+                if (downloadLeft > MIN_SWEEP) {
+                    canvas.drawArc(
+                        arcBounds,
+                        TRIM_ORIGIN + 360f * visual.downloadLeftOffset,
+                        downloadLeft,
+                        false,
+                        ring
+                    )
+                }
+                val downloadRight = visual.downloadRightEnd * 360f
+                if (downloadRight > MIN_SWEEP) {
+                    canvas.drawArc(
+                        arcBounds,
+                        TRIM_ORIGIN + 360f * visual.downloadRightOffset,
+                        downloadRight,
+                        false,
+                        ring
+                    )
+                }
+                ring.shader = null
+                ring.alpha = 255
             }
         }
 

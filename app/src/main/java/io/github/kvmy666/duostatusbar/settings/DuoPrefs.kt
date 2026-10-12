@@ -49,6 +49,11 @@ data class DuoSettings(
     /** Horizontal nudge for that icon cluster, in dp. Independent of [offsetX], which moves the ring. */
     val indicatorsOffsetX: Int = 0,
     /**
+     * When true, and [splitIndicators] is on, the ring is centered on the status bar and [offsetX] nudges
+     * it from that center. The clock changing width does not move it. Off leaves the ring in the icon strip.
+     */
+    val lockRing: Boolean = false,
+    /**
      * Whether a size/position change reaches the running status bar immediately. Off means the value
      * is saved but only applied on the next start (the Restart System UI button), which is the safe
      * path: resizing the Rive view while System UI runs is what used to take it down.
@@ -86,6 +91,14 @@ data class DuoSettings(
     val tapAction: String = "no_action",
     val doubleTapAction: String = "no_action",
     val longPressAction: String = "no_action",
+    /**
+     * The icon cluster gets its own actions while [splitIndicators] is on. These are ignored in the
+     * original one-piece layout. Missing stored values inherit the ring actions so an existing split
+     * setup keeps behaving exactly as it did before this distinction was added.
+     */
+    val indicatorsTapAction: String = "no_action",
+    val indicatorsDoubleTapAction: String = "no_action",
+    val indicatorsLongPressAction: String = "no_action",
     /**
      * How the element picks its black/white foreground: `"auto"` follows the status bar itself (captured
      * from SystemUI's own icon tint, with system day/night as a fallback), `"black"` and `"white"` are
@@ -180,6 +193,9 @@ object DuoPrefs {
     const val COL_TAP = "tap_action"
     const val COL_DOUBLE_TAP = "double_tap_action"
     const val COL_LONG_PRESS = "long_press_action"
+    const val COL_INDICATORS_TAP = "indicators_tap_action"
+    const val COL_INDICATORS_DOUBLE_TAP = "indicators_double_tap_action"
+    const val COL_INDICATORS_LONG_PRESS = "indicators_long_press_action"
     const val COL_REVEAL_MS = "reveal_ms"
     const val COL_ANIMATIONS = "animations_enabled"
     const val COL_ARRIVAL = "arrival_enabled"
@@ -212,6 +228,8 @@ object DuoPrefs {
     const val COL_SIM_CHOICE = "sim_choice"
     const val COL_WIFI_DOTS = "wifi_dots"
     const val COL_EDGE_PADDING = "edge_padding"
+    /** Centers the ring on the status bar so a wider clock cannot push it off a camera cutout. */
+    const val COL_LOCK_RING = "lock_ring"
 
     /** Prefixed onto every landscape column. Portrait keeps the original names, so old installs stay put. */
     const val LAND_PREFIX = "land_"
@@ -228,7 +246,8 @@ object DuoPrefs {
         COL_ICON_COLOR, COL_HIDE_OTHER_ICONS, COL_NETWORK_ONLY, COL_SIM_CHOICE,
         COL_PERCENT_HEIGHT, COL_SPLIT_INDICATORS, COL_INDICATORS_OFFSET_X,
         COL_WIFI_DOTS, COL_SHOW_AIRPLANE, COL_SHOW_DND, COL_EDGE_PADDING, COL_DND_MODE,
-        COL_SHOW_CHARGING_BOLT
+        COL_SHOW_CHARGING_BOLT, COL_LOCK_RING,
+        COL_INDICATORS_TAP, COL_INDICATORS_DOUBLE_TAP, COL_INDICATORS_LONG_PRESS
     )
 
     /** Landscape columns appended after [PORTRAIT_COLUMNS]. An older module ignores names it does not know. */
@@ -279,10 +298,19 @@ object DuoPrefs {
         useRive = p.getBoolean(prefix + COL_USE_RIVE, true),
         showPercent = p.getBoolean(prefix + COL_SHOW_PERCENT, true),
         sizePercent = p.getInt(prefix + COL_SIZE_PERCENT, 100),
-        offsetX = p.getInt(prefix + COL_OFFSET_X, 0),
+        offsetX = p.getInt(prefix + COL_OFFSET_X, 0).let { stored ->
+            if (p.getBoolean(prefix + COL_SPLIT_INDICATORS, false) &&
+                p.getBoolean(prefix + COL_LOCK_RING, false)
+            ) {
+                stored
+            } else {
+                stored.coerceIn(-MAX_UNLOCKED_RING_OFFSET, MAX_UNLOCKED_RING_OFFSET)
+            }
+        },
         percentHeight = p.getInt(prefix + COL_PERCENT_HEIGHT, DEFAULT_PERCENT_HEIGHT),
         splitIndicators = p.getBoolean(prefix + COL_SPLIT_INDICATORS, false),
         indicatorsOffsetX = p.getInt(prefix + COL_INDICATORS_OFFSET_X, 0),
+        lockRing = p.getBoolean(prefix + COL_LOCK_RING, false),
         liveApply = p.getBoolean(prefix + COL_LIVE_APPLY, true),
         systemClockFont = p.getBoolean(prefix + COL_CLOCK_FONT, true),
         revealMs = nearestReveal(p.getInt(prefix + COL_REVEAL_MS, DEFAULT_REVEAL_MS)),
@@ -294,6 +322,12 @@ object DuoPrefs {
         tapAction = p.getString(prefix + COL_TAP, "no_action") ?: "no_action",
         doubleTapAction = p.getString(prefix + COL_DOUBLE_TAP, "no_action") ?: "no_action",
         longPressAction = p.getString(prefix + COL_LONG_PRESS, "no_action") ?: "no_action",
+        indicatorsTapAction = p.getString(prefix + COL_INDICATORS_TAP, null)
+            ?: p.getString(prefix + COL_TAP, "no_action") ?: "no_action",
+        indicatorsDoubleTapAction = p.getString(prefix + COL_INDICATORS_DOUBLE_TAP, null)
+            ?: p.getString(prefix + COL_DOUBLE_TAP, "no_action") ?: "no_action",
+        indicatorsLongPressAction = p.getString(prefix + COL_INDICATORS_LONG_PRESS, null)
+            ?: p.getString(prefix + COL_LONG_PRESS, "no_action") ?: "no_action",
         iconColor = p.getString(prefix + COL_ICON_COLOR, "auto") ?: "auto",
         hideOtherIcons = p.getBoolean(prefix + COL_HIDE_OTHER_ICONS, false),
         // The old "network icons only" switch hid both statuses. A phone that still has only that
@@ -320,9 +354,16 @@ object DuoPrefs {
         val next = revision(context) + 1
         val clamped = settings.copy(
             sizePercent = settings.sizePercent.coerceIn(MIN_SIZE, MAX_SIZE),
-            offsetX = settings.offsetX.coerceIn(-MAX_OFFSET, MAX_OFFSET),
+            offsetX = if (settings.splitIndicators && settings.lockRing) {
+                settings.offsetX
+            } else {
+                settings.offsetX.coerceIn(-MAX_UNLOCKED_RING_OFFSET, MAX_UNLOCKED_RING_OFFSET)
+            },
             percentHeight = settings.percentHeight.coerceIn(MIN_PERCENT_HEIGHT, MAX_PERCENT_HEIGHT),
-            indicatorsOffsetX = settings.indicatorsOffsetX.coerceIn(-MAX_OFFSET, MAX_OFFSET),
+            indicatorsOffsetX = settings.indicatorsOffsetX.coerceIn(
+                -MAX_INDICATORS_OFFSET,
+                MAX_INDICATORS_OFFSET
+            ),
             edgePadding = settings.edgePadding.coerceIn(MIN_EDGE_PADDING, MAX_EDGE_PADDING),
             revealMs = nearestReveal(settings.revealMs),
             dndMode = normalizeDndMode(settings.dndMode)
@@ -343,6 +384,7 @@ object DuoPrefs {
         putInt(prefix + COL_PERCENT_HEIGHT, settings.percentHeight)
         putBoolean(prefix + COL_SPLIT_INDICATORS, settings.splitIndicators)
         putInt(prefix + COL_INDICATORS_OFFSET_X, settings.indicatorsOffsetX)
+        putBoolean(prefix + COL_LOCK_RING, settings.lockRing)
         putBoolean(prefix + COL_LIVE_APPLY, settings.liveApply)
         putBoolean(prefix + COL_CLOCK_FONT, settings.systemClockFont)
         putInt(prefix + COL_REVEAL_MS, settings.revealMs)
@@ -354,6 +396,9 @@ object DuoPrefs {
         putString(prefix + COL_TAP, settings.tapAction)
         putString(prefix + COL_DOUBLE_TAP, settings.doubleTapAction)
         putString(prefix + COL_LONG_PRESS, settings.longPressAction)
+        putString(prefix + COL_INDICATORS_TAP, settings.indicatorsTapAction)
+        putString(prefix + COL_INDICATORS_DOUBLE_TAP, settings.indicatorsDoubleTapAction)
+        putString(prefix + COL_INDICATORS_LONG_PRESS, settings.indicatorsLongPressAction)
         putString(prefix + COL_ICON_COLOR, settings.iconColor)
         putBoolean(prefix + COL_HIDE_OTHER_ICONS, settings.hideOtherIcons)
         // Kept so a module that predates the two switches still hides both when neither is allowed
@@ -538,7 +583,8 @@ object DuoPrefs {
 
     const val MIN_SIZE = 60
     const val MAX_SIZE = 200
-    const val MAX_OFFSET = 200
+    const val MAX_UNLOCKED_RING_OFFSET = 200
+    const val MAX_INDICATORS_OFFSET = 200
 
     /** 0 keeps the percentage in its original seat; 100 raises it by the full punch-hole clearance. */
     const val MIN_PERCENT_HEIGHT = 0

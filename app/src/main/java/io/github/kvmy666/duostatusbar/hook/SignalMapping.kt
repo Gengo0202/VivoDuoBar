@@ -113,8 +113,13 @@ object SignalMapping {
      * Android-free on purpose: the type constants are spelled out as literals so this stays in the
      * pure, unit-tested half. Unknown or Wi-Fi-calling types map to empty, which leaves the slot off
      * rather than showing a label that means nothing.
+     *
+     * [dataEnabled] is the user's mobile-data switch. Voice service stays registered after that switch
+     * is turned off, so the radio type would still read 5G/4G; the slot names the data path, and with
+     * data off there is nothing to name.
      */
-    fun networkGeneration(type: Int, nrConnected: Boolean = false): String {
+    fun networkGeneration(type: Int, nrConnected: Boolean = false, dataEnabled: Boolean = true): String {
+        if (!dataEnabled) return ""
         // The phone's radio reports NR as connected. On 5G NSA the data network type is still LTE, so
         // this is the only honest 5G signal - it is what the stock OxygenOS bar reads (see
         // `OplusMobileSignalExImpl`: `ServiceState.getNrState()` 2 or 3 means 5G).
