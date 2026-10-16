@@ -1,0 +1,45 @@
+name: downloads badge
+
+# The README downloads badge reads docs/badges/downloads.json through shields.io's
+# dynamic/json endpoint, which - unlike shields' github endpoints - does not depend on
+# shields' GitHub token pool and so keeps working when that pool is exhausted
+# ("Unable to select next GitHub token from pool"), which blanks the github badges.
+# This job keeps the number in that file current.
+
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sum release asset downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          total=$(gh api "repos/${{ github.repository }}/releases" --paginate --slurp \
+            --jq '[.[] | .[] | .assets[] | .download_count] | add // 0')
+          mkdir -p docs/badges
+          printf '{\n  "downloads": %s\n}\n' "$total" > docs/badges/downloads.json
+          echo "total downloads: $total"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- docs/badges/downloads.json; then
+            echo "no change"
+          else
+            git add docs/badges/downloads.json
+            git commit -m "chore: refresh downloads badge"
+            git push
+          fi

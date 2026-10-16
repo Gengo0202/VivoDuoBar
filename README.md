@@ -1,7 +1,7 @@
 # Duo Status Bar
 
-[![Downloads](https://img.shields.io/github/downloads/kvmy666/duoStatusBar/total?label=downloads)](https://github.com/kvmy666/duoStatusBar/releases)
-[![Latest release](https://img.shields.io/github/v/release/kvmy666/duoStatusBar)](https://github.com/kvmy666/duoStatusBar/releases)
+[![Downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fkvmy666%2FduoStatusBar%2Fmain%2Fdocs%2Fbadges%2Fdownloads.json&query=%24.downloads&label=Downloads&color=blue&logo=github)](https://github.com/kvmy666/duoStatusBar/releases)
+[![Latest release](https://badgen.net/github/release/kvmy666/duoStatusBar)](https://github.com/kvmy666/duoStatusBar/releases)
 [![Android 13+](https://img.shields.io/badge/Android-13%2B-3ddc84)](https://developer.android.com)
 
 Duo Status Bar replaces the battery, Wi-Fi and mobile signal icons in your status bar with one clean,
