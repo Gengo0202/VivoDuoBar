@@ -107,6 +107,19 @@ internal object Diag {
             appendLine("window:")
             appendWindowFacts(context, this, root)
 
+            // A dump taken while the bar window is detached (report: "status bar vanishes after unlock",
+            // every probe "view not in this window") otherwise looks like a functioning ROM with a missing
+            // strip. Say so loudly, and lean on the shade window dumped below for whatever evidence it has.
+            val barAttached = root != null && root.isAttachedToWindow &&
+                root.width > 0 && root.height > 0
+            if (!barAttached) {
+                appendLine()
+                appendLine("!!! CAPTURE INCOMPLETE: the status bar window was not attached or measured")
+                appendLine("!!! when this dump was taken. The container probes and the status-bar view tree")
+                appendLine("!!! below are empty for that reason. Re-take the report with the bar on screen.")
+                appendLine()
+            }
+
             appendLine("container probes (id -> view):")
             for (name in CANDIDATE_IDS) {
                 val id = RomResources.id(context, rom, name)

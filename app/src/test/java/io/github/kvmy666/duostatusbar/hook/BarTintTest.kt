@@ -39,4 +39,32 @@ class BarTintTest {
         assertEquals(0, BarTint.pickTint(arrayOf("x", 0.5f, true)))
         assertEquals(0, BarTint.pickTint(emptyArray()))
     }
+
+    @Test
+    fun `the first reading commits immediately`() {
+        BarTint.reset()
+        assertEquals(true, BarTint.update(BarTint.WHITE))
+    }
+
+    @Test
+    fun `a real change needs two consecutive readings`() {
+        BarTint.reset()
+        BarTint.update(BarTint.WHITE)
+        // One black reading is not enough; the scrim may still be animating.
+        assertEquals(false, BarTint.update(BarTint.BLACK))
+        // The second agreeing reading commits the switch.
+        assertEquals(true, BarTint.update(BarTint.BLACK))
+    }
+
+    @Test
+    fun `an alternating stream never repaints`() {
+        BarTint.reset()
+        BarTint.update(BarTint.WHITE)
+        // The Samsung Android 17 report: onDarkChanged alternates every callback. None of these may
+        // commit, so the element does not flicker.
+        repeat(6) {
+            assertEquals(false, BarTint.update(BarTint.BLACK))
+            assertEquals(false, BarTint.update(BarTint.WHITE))
+        }
+    }
 }

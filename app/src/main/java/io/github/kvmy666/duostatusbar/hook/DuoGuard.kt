@@ -163,6 +163,17 @@ internal class DuoGuard(private val context: Context) {
      */
     fun noteLoaded() {
         putLong(KEY_LAST_LOAD, System.currentTimeMillis())
+        noteHeartbeat()
+    }
+
+    /**
+     * Updates the "the module is running right now" stamp. [noteLoaded] writes it once at load; the state
+     * monitor keeps it fresh while the process lives. The app reads it to tell "the module is gone" (just
+     * unscoped and System UI restarted) from "the module is here and healthy" — without it, a report taken
+     * after unscoping shipped the *previous* run's dump and status and looked like it had loaded fine.
+     */
+    fun noteHeartbeat() {
+        putLong(KEY_HEARTBEAT, System.currentTimeMillis())
     }
 
     private fun put(key: String, value: Int) {
@@ -195,6 +206,9 @@ internal class DuoGuard(private val context: Context) {
 
         /** Wall-clock ms of the last time the module ran inside SystemUI; 0 means it never has. */
         const val KEY_LAST_LOAD = "duo_statusbar_last_load"
+
+        /** Wall-clock ms the module last proved it is alive; refreshed by the state monitor. */
+        const val KEY_HEARTBEAT = "duo_statusbar_heartbeat"
         /** How many *processes* may die to Rive before it is given up on. */
         private const val MAX_ATTEMPTS = 2
 

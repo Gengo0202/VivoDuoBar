@@ -62,9 +62,9 @@ internal class SlotGeometry(private val context: Context, private val rom: RomAd
             slotBasePx > 0 -> slotBasePx
             else -> measuredWidth(container)
         }
-        val scaled = measured * appliedSize / 100
+        val scaled = (measured * appliedSize / 100).coerceAtLeast(1)
         val height = (windowRoot?.height ?: 0).takeIf { it > 0 } ?: return scaled
-        return scaled.coerceAtMost(height)
+        return scaled.coerceAtMost(height).coerceAtLeast(1)
     }
 
     /** The element's width in px, used for the Canvas fallback's layout params. */

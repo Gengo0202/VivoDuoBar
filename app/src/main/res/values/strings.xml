@@ -161,6 +161,12 @@
     <string name="module_health_noreport_title">Duo is loaded but not responding</string>
     <string name="module_health_noreport_text">Loaded but not reporting. Restart System UI.</string>
     <string name="module_health_never_title">Duo is not running</string>
+    <string name="module_health_never_text">LSPosed has not injected Duo into System UI. Open LSPosed, enable Duo Status Bar and tick System UI in its scope, then restart System UI. If it still does not appear, contact support.</string>
+    <string name="module_health_open_lsposed">Open LSPosed</string>
+    <string name="module_health_scope_hint">Enable Duo and tick System UI in its scope.</string>
+    <string name="module_health_contact">Contact on Telegram</string>
+    <string name="module_health_contact_hint">Still not working? Contact here.</string>
+    <string name="module_health_export">Export my log</string>
     <string name="settings_problem">What went wrong?</string>
     <string name="settings_problem_hint">Describe the problem</string>
     <string name="settings_collect_log">Send the bug to the developer</string>

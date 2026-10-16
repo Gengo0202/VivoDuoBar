@@ -565,6 +565,21 @@ object DuoPrefs {
         0L
     }
 
+    /**
+     * When the module last proved it is still running (wall clock ms), or 0 if it never wrote one. Unlike
+     * [moduleLoadTime] this stays fresh while the process lives, so the app can tell "the module is here"
+     * from "it was just unscoped and System UI restarted without it" — the case where a report used to ship
+     * the previous run's dump and status.
+     */
+    fun heartbeat(context: Context): Long = try {
+        Settings.Global.getLong(context.contentResolver, "duo_statusbar_heartbeat", 0L)
+    } catch (_: Throwable) {
+        0L
+    }
+
+    /** A heartbeat older than this means the module is not running now. Three missed beats at 20 s. */
+    const val HEARTBEAT_STALE_MS = 90_000L
+
     // Same bounds the module clamps to, so the two sides cannot disagree about what a legal value is.
     // Raised to 200 so the element can grow to the status bar's own height (the module caps the drawn
     // side at the window height, so 200 % is the ceiling that is actually reachable).

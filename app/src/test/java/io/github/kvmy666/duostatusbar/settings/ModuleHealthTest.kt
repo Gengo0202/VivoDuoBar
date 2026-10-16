@@ -10,6 +10,10 @@ import org.junit.Test
  */
 class ModuleHealthTest {
 
+    // A clock and a heartbeat the module would have written just now.
+    private val now = 10_000_000L
+    private val fresh = now - 1_000L
+
     @Test
     fun `never loaded when there is no load stamp`() {
         assertEquals(ModuleState.NEVER_LOADED, ModuleHealthCheck.decide(0L, 1_000L, true))
@@ -18,17 +22,30 @@ class ModuleHealthTest {
 
     @Test
     fun `needs a restart when the apk is newer than the last load`() {
-        assertEquals(ModuleState.NEEDS_RESTART, ModuleHealthCheck.decide(100L, 200L, false))
-        assertEquals(ModuleState.NEEDS_RESTART, ModuleHealthCheck.decide(100L, 200L, true))
+        assertEquals(ModuleState.NEEDS_RESTART, ModuleHealthCheck.decide(100L, 200L, false, fresh, now))
+        assertEquals(ModuleState.NEEDS_RESTART, ModuleHealthCheck.decide(100L, 200L, true, fresh, now))
     }
 
     @Test
     fun `not reporting when loaded after the update but no status arrived`() {
-        assertEquals(ModuleState.NOT_REPORTING, ModuleHealthCheck.decide(200L, 100L, true))
+        assertEquals(ModuleState.NOT_REPORTING, ModuleHealthCheck.decide(200L, 100L, true, fresh, now))
     }
 
     @Test
     fun `ok when loaded after the update and reporting`() {
-        assertEquals(ModuleState.OK, ModuleHealthCheck.decide(200L, 100L, false))
+        assertEquals(ModuleState.OK, ModuleHealthCheck.decide(200L, 100L, false, fresh, now))
+    }
+
+    @Test
+    fun `no heartbeat means the module is not running now`() {
+        // The unscoped case: last_load is old and no heartbeat was ever written, so the stored status
+        // (non-blank) and the stale dump must not be reported as a healthy module.
+        assertEquals(ModuleState.NEVER_LOADED, ModuleHealthCheck.decide(200L, 100L, false, 0L, now))
+    }
+
+    @Test
+    fun `a stale heartbeat means the module is not running now`() {
+        val stale = now - DuoPrefs.HEARTBEAT_STALE_MS - 1
+        assertEquals(ModuleState.NEVER_LOADED, ModuleHealthCheck.decide(200L, 100L, false, stale, now))
     }
 }

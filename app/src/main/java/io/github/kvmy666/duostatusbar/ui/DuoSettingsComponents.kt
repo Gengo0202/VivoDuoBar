@@ -166,8 +166,11 @@ internal fun StageOverrideAlert(
 internal fun ModuleHealthCard(
     state: ModuleState,
     busy: Boolean,
+    onOpenLsposed: () -> Unit,
     onRestart: () -> Unit,
     onReboot: () -> Unit,
+    onTelegram: () -> Unit,
+    onExport: () -> Unit,
     onReport: () -> Unit
 ) {
     val title = when (state) {
@@ -178,7 +181,7 @@ internal fun ModuleHealthCard(
     val text = when (state) {
         ModuleState.NEEDS_RESTART -> R.string.module_health_restart_text
         ModuleState.NOT_REPORTING -> R.string.module_health_noreport_text
-        else -> R.string.settings_module_never
+        else -> R.string.module_health_never_text
     }
     Card(
         colors = CardDefaults.cardColors(
@@ -189,14 +192,37 @@ internal fun ModuleHealthCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(text), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onRestart, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.settings_restart))
+            // Not injected: the fix is in LSPosed (enable + System UI scope) and a restart, not a report -
+            // the module has produced nothing to report. A user in this state can never send a useful dump,
+            // so the report button is replaced by the two recovery steps and a way to reach support.
+            if (state == ModuleState.NEVER_LOADED) {
+                Text(stringResource(R.string.module_health_scope_hint), style = MaterialTheme.typography.bodySmall)
+                Button(onClick = onOpenLsposed, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.module_health_open_lsposed))
+                }
+                OutlinedButton(onClick = onRestart, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_restart))
+                }
+                // Even without an injection there is an app-side report worth having (build, device, ROM,
+                // module state), so a user stuck here can still save it and send it on.
+                OutlinedButton(onClick = onExport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.module_health_export))
+                }
+            } else {
+                Button(onClick = onRestart, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_restart))
+                }
+                OutlinedButton(onClick = onReboot, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_reboot))
+                }
+                OutlinedButton(onClick = onReport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(if (busy) R.string.settings_collecting else R.string.settings_report_bug))
+                }
             }
-            OutlinedButton(onClick = onReboot, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.settings_reboot))
-            }
-            OutlinedButton(onClick = onReport, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(if (busy) R.string.settings_collecting else R.string.settings_report_bug))
+            // Escalation, for when the automatic recovery does not work.
+            Text(stringResource(R.string.module_health_contact_hint), style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = onTelegram, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.module_health_contact))
             }
         }
     }

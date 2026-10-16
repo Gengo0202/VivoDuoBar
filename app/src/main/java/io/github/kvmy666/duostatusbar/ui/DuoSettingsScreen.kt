@@ -208,7 +208,17 @@ fun DuoSettingsScreen(modifier: Modifier = Modifier) {
             val logs = withContext(Dispatchers.IO) { RootLogs.collect(context) }
             collecting = false
             val message = problem.trim()
-            val report = buildFullReport(problem, settings, status, history, refreshedDump(), moduleLoadAt, logs)
+            // Only trust the stored module status/dump while the module is actually running; after it is
+            // unscoped the persisted values are the *previous* run and would read as a healthy report.
+            val alive = moduleHealth.state != ModuleState.NEVER_LOADED
+            val report = buildFullReport(
+                context, problem, settings,
+                if (alive) status else "",
+                if (alive) history else emptyList(),
+                if (alive) refreshedDump() else "",
+                if (alive) moduleLoadAt else 0L,
+                logs
+            )
             val file = writeDiagnostics(context, report)
             if (file == null) {
                 shareText(context, report)
@@ -291,8 +301,32 @@ fun DuoSettingsScreen(modifier: Modifier = Modifier) {
             ModuleHealthCard(
                 state = moduleHealth.state,
                 busy = collecting,
+                onOpenLsposed = { openLsposed(context) },
                 onRestart = { restartSystemUi(context) },
                 onReboot = { scope.launch { withContext(Dispatchers.IO) { RootLogs.reboot() } } },
+                onTelegram = { openTelegramChat(context) },
+                onExport = {
+                    if (!collecting) {
+                        collecting = true
+                        logSent = false
+                        scope.launch {
+                            val logs = withContext(Dispatchers.IO) { RootLogs.collect(context) }
+                            collecting = false
+                            val alive = moduleHealth.state != ModuleState.NEVER_LOADED
+                            pendingExport =
+                                buildFullReport(
+                                    context, "", settings,
+                                    if (alive) status else "",
+                                    if (alive) history else emptyList(),
+                                    if (alive) dump else "",
+                                    if (alive) moduleLoadAt else 0L,
+                                    logs
+                                )
+                            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                            exportLog.launch("duo-log-$stamp.txt")
+                        }
+                    }
+                },
                 onReport = { collectAndSend() }
             )
         }
@@ -310,9 +344,16 @@ fun DuoSettingsScreen(modifier: Modifier = Modifier) {
                             // Same full log as the About button: the module dump plus the device capture.
                             val logs = withContext(Dispatchers.IO) { RootLogs.collect(context) }
                             collecting = false
+                            val alive = moduleHealth.state != ModuleState.NEVER_LOADED
                             sendLogOnTelegram(
                                 context,
-                                buildDiagnostics(settings, status, history, dump, moduleLoadAt) +
+                                buildDiagnostics(
+                                    context, settings,
+                                    if (alive) status else "",
+                                    if (alive) history else emptyList(),
+                                    if (alive) dump else "",
+                                    if (alive) moduleLoadAt else 0L
+                                ) +
                                     "\n\n===== device capture =====\n" + logs
                             )
                         }
@@ -401,6 +442,7 @@ fun DuoSettingsScreen(modifier: Modifier = Modifier) {
             status = status,
             history = history,
             moduleLoadAt = moduleLoadAt,
+            moduleAlive = moduleHealth.state != ModuleState.NEVER_LOADED,
             accessGranted = accessGranted,
             problem = problem,
             onProblemChange = { problem = it; logSent = false },
@@ -414,8 +456,14 @@ fun DuoSettingsScreen(modifier: Modifier = Modifier) {
                 scope.launch {
                     val logs = withContext(Dispatchers.IO) { RootLogs.collect(context) }
                     exporting = false
+                    val alive = moduleHealth.state != ModuleState.NEVER_LOADED
                     pendingExport = buildFullReport(
-                        problem, settings, status, history, refreshedDump(), moduleLoadAt, logs
+                        context, problem, settings,
+                        if (alive) status else "",
+                        if (alive) history else emptyList(),
+                        if (alive) refreshedDump() else "",
+                        if (alive) moduleLoadAt else 0L,
+                        logs
                     )
                     val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
                     exportLog.launch("duo-log-$stamp.txt")

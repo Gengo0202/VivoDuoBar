@@ -4,9 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import io.github.kvmy666.duostatusbar.BuildConfig
 import io.github.kvmy666.duostatusbar.L
 import io.github.kvmy666.duostatusbar.R
+import io.github.kvmy666.duostatusbar.hook.rom.RomDetection
+import io.github.kvmy666.duostatusbar.hook.rom.RomProfiles
 import io.github.kvmy666.duostatusbar.settings.DuoSettings
+import io.github.kvmy666.duostatusbar.settings.ModuleHealthCheck
 import io.github.kvmy666.duostatusbar.settings.TelegramLog
 import java.io.File
 import java.text.SimpleDateFormat
@@ -55,6 +59,26 @@ internal fun sendLogOnTelegram(context: Context, report: String) {
         .onFailure { L.w("telegram open: ${it.message}") }
 }
 
+/** Opens the developer's Telegram chat, for a user who cannot yet produce a module report. */
+internal fun openTelegramChat(context: Context) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(TELEGRAM_CHAT_URL))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }.onFailure { L.w("telegram chat open: ${it.message}") }
+}
+
+/** Opens the LSPosed manager, where the module is enabled and System UI is added to its scope. */
+internal fun openLsposed(context: Context): Boolean {
+    val launch = context.packageManager.getLaunchIntentForPackage("org.lsposed.manager")
+        ?: return false
+    return runCatching {
+        context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    }.getOrDefault(false)
+}
+
 /** Opens a new GitHub issue with the device and status pre-filled; the report file can be attached there. */
 internal fun openGitHubIssue(context: Context, fallback: String, status: String) {
     val body = buildString {
@@ -75,6 +99,7 @@ internal fun openGitHubIssue(context: Context, fallback: String, status: String)
 
 /** The report the About buttons send — one text, shared or written to a file. */
 internal fun buildDiagnostics(
+    context: Context,
     settings: DuoSettings,
     status: String,
     history: List<String>,
@@ -96,6 +121,10 @@ internal fun buildDiagnostics(
             appendLine("history:")
             history.forEach { appendLine("  $it") }
         }
+        // Always present, so even a report with no module log says exactly which build, device and
+        // module state it came from - the facts that fix a "nothing happens" report.
+        appendLine()
+        append(appEnvironment(context))
         // The debug build's full dump (build identity, id probes, view tree, readers). Empty in release.
         if (dump.isNotEmpty()) {
             appendLine()
@@ -103,8 +132,46 @@ internal fun buildDiagnostics(
         }
     }
 
+/**
+ * Facts the app can always read, even when the module never loaded and there is no root. This is what
+ * turns a ~1 KB "module load: never" report into something actionable: the app build, the device identity,
+ * the ROM adapter and, above all, whether LSPosed actually has the module enabled and scoped.
+ */
+internal fun appEnvironment(context: Context): String = buildString {
+    appendLine("=== app environment ===")
+    appendLine("app: ${BuildConfig.VERSION_NAME} (code ${BuildConfig.VERSION_CODE}, debug=${BuildConfig.DEBUG})")
+    appendLine(
+        "device: ${android.os.Build.MANUFACTURER} ${android.os.Build.BRAND} " +
+            "${android.os.Build.MODEL} / ${android.os.Build.DEVICE} / ${android.os.Build.PRODUCT}"
+    )
+    appendLine("android: SDK ${android.os.Build.VERSION.SDK_INT} RELEASE ${android.os.Build.VERSION.RELEASE}")
+    val sysui = packageVersion(context, "com.android.systemui") ?: "not visible"
+    appendLine("systemui: $sysui")
+    val rom = runCatching {
+        RomDetection.forThisRom(
+            android.os.Build.MANUFACTURER.orEmpty(), android.os.Build.BRAND.orEmpty(),
+            android.os.Build.PRODUCT.orEmpty(), android.os.Build.DISPLAY.orEmpty(), RomProfiles.load(context)
+        )
+    }.getOrNull()
+    appendLine("rom adapter: ${rom?.id ?: "unknown"} (measured=${rom?.measured ?: false})")
+    val lsposed = hasPackage(context, "org.lsposed.manager")
+    appendLine("lsposed manager installed: $lsposed")
+    append("module state: ${runCatching { ModuleHealthCheck.of(context).state }.getOrDefault("unknown")}")
+}
+
+private fun packageVersion(context: Context, pkg: String): String? = try {
+    val info = context.packageManager.getPackageInfo(pkg, 0)
+    "${info.versionName} (code ${@Suppress("DEPRECATION") info.versionCode})"
+} catch (_: Throwable) {
+    null
+}
+
+private fun hasPackage(context: Context, pkg: String): Boolean =
+    runCatching { context.packageManager.getApplicationInfo(pkg, 0) }.isSuccess
+
 /** The complete bug report: the user's description, the diagnostics, then the device capture. */
 internal fun buildFullReport(
+    context: Context,
     problem: String,
     settings: DuoSettings,
     status: String,
@@ -119,7 +186,7 @@ internal fun buildFullReport(
         appendLine(message)
         appendLine()
     }
-    append(buildDiagnostics(settings, status, history, dump, moduleLoadAt))
+    append(buildDiagnostics(context, settings, status, history, dump, moduleLoadAt))
     append("\n\n===== device capture =====\n")
     append(logs)
 }

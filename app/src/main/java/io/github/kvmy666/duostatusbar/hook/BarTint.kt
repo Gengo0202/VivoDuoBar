@@ -18,6 +18,9 @@ internal object BarTint {
     const val BLACK = DuoMapping.BLACK
     const val WHITE = DuoMapping.WHITE
 
+    /** How many consecutive agreeing readings a new colour needs before it is committed. */
+    private const val STABLE_READINGS = 2
+
     /** Normalised to black or white; 0 until something is captured. */
     @Volatile
     private var normalized: Int = 0
@@ -25,24 +28,59 @@ internal object BarTint {
     @Volatile
     private var captured = false
 
+    /** The decision waiting to settle, and how many consecutive readings agreed on it. */
+    @Volatile
+    private var pending: Int = 0
+    @Volatile
+    private var pendingCount = 0
+
     private val logOnce = LogOnce()
 
     /**
-     * Records a tint SystemUI applied to its icons. Returns true when the black/white decision actually
-     * changed, so a caller can redraw only then (the dark/light transition animates through many values).
+     * Records a tint SystemUI applied to its icons. Returns true only when the black/white decision has
+     * **settled**, so a caller redraws once per real transition rather than per frame.
+     *
+     * `onDarkChanged` fires as the bar's scrim animates, and on some ROMs it alternates black/white every
+     * callback (measured: 206 flips in the Samsung Android 17 report). Committing each one repainted the
+     * element several times a second — the user-visible flicker. A new decision must therefore be seen
+     * [STABLE_READINGS] times in a row before it is committed; an alternating stream never repeats, so it
+     * never commits and the bar stays put. The first capture commits immediately (there is nothing to
+     * flicker against).
      */
     fun update(color: Int): Boolean {
         if (color == 0) return false
         val next = if (isDark(color)) BLACK else WHITE
-        val changed = !captured || next != normalized
-        normalized = next
-        captured = true
-        if (changed) {
-            logOnce.once("bar") {
-                L.i("status bar icons are ${if (next == BLACK) "dark" else "light"} - matching them")
-            }
+        if (captured && next == normalized) {
+            pending = 0
+            pendingCount = 0
+            return false
         }
-        return changed
+        if (next == pending) pendingCount++ else {
+            pending = next
+            pendingCount = 1
+        }
+        if (!captured || pendingCount >= STABLE_READINGS) {
+            val changed = !captured || next != normalized
+            normalized = next
+            captured = true
+            pending = 0
+            pendingCount = 0
+            if (changed) {
+                logOnce.once("bar") {
+                    L.i("status bar icons are ${if (next == BLACK) "dark" else "light"} - matching them")
+                }
+            }
+            return changed
+        }
+        return false
+    }
+
+    /** Forgets the captured colour and any pending decision (teardown / tests). */
+    fun reset() {
+        normalized = 0
+        captured = false
+        pending = 0
+        pendingCount = 0
     }
 
     /**

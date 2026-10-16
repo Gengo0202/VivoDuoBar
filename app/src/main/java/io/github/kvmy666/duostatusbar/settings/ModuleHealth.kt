@@ -36,12 +36,33 @@ internal object ModuleHealthCheck {
         val loadedAt = DuoPrefs.moduleLoadTime(context)
         val statusBlank = DuoPrefs.status(context).isBlank()
         val updatedAt = appUpdatedAt(context)
-        return ModuleHealth(decide(loadedAt, updatedAt, statusBlank), loadedAt, updatedAt)
+        val heartbeat = DuoPrefs.heartbeat(context)
+        return ModuleHealth(
+            decide(loadedAt, updatedAt, statusBlank, heartbeat, System.currentTimeMillis()),
+            loadedAt,
+            updatedAt
+        )
     }
 
-    /** Pure decision, so the rule is unit-tested rather than only exercised on a phone. */
-    fun decide(loadedAt: Long, appUpdatedAt: Long, statusBlank: Boolean): ModuleState = when {
+    /**
+     * Pure decision, so the rule is unit-tested rather than only exercised on a phone.
+     *
+     * [heartbeatAt] is the module's "alive right now" stamp and [nowMs] the clock. The module is only
+     * trusted when that stamp is present and fresh: a heartbeat of 0 means it never ran (or the running
+     * build predates the heartbeat), and an old one means it was unscoped and System UI restarted without
+     * it. Both are [ModuleState.NEVER_LOADED], so a report taken then cannot ship the previous run's
+     * dump/status as if the module were healthy (measured: unscope, restart, send -> full but stale).
+     */
+    fun decide(
+        loadedAt: Long,
+        appUpdatedAt: Long,
+        statusBlank: Boolean,
+        heartbeatAt: Long = 0L,
+        nowMs: Long = 0L
+    ): ModuleState = when {
         loadedAt <= 0L -> ModuleState.NEVER_LOADED
+        heartbeatAt <= 0L -> ModuleState.NEVER_LOADED
+        nowMs > 0L && nowMs - heartbeatAt > DuoPrefs.HEARTBEAT_STALE_MS -> ModuleState.NEVER_LOADED
         // The APK changed after the module last loaded, so System UI is running the previous build.
         appUpdatedAt > loadedAt -> ModuleState.NEEDS_RESTART
         statusBlank -> ModuleState.NOT_REPORTING

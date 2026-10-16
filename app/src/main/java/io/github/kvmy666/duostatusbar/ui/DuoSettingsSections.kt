@@ -577,6 +577,7 @@ internal fun AboutSection(
     status: String,
     history: List<String>,
     moduleLoadAt: Long,
+    moduleAlive: Boolean,
     accessGranted: Boolean,
     problem: String,
     onProblemChange: (String) -> Unit,
@@ -594,12 +595,12 @@ internal fun AboutSection(
     onDownload: () -> Unit
 ) {
     val context = LocalContext.current
-    // Sending is only allowed when the report will actually be useful: the user described the problem
-    // AND there is at least one source of evidence — root, Shizuku, or the module's own pushed log
-    // (the "my log shares fine" case, which needs no root).
+    // Sending needs the module actually running: otherwise the report would carry the previous run's
+    // dump/status (the unscope-and-restart case), which is worse than no report. The health card above
+    // offers recovery + an export of the app-side facts while the module is not loaded.
     val described = problem.trim().isNotEmpty()
-    val hasModuleLog = moduleLoadAt > 0L
-    val canSend = described && (accessGranted || hasModuleLog)
+    val hasModuleLog = moduleAlive && moduleLoadAt > 0L
+    val canSend = described && moduleAlive && (accessGranted || hasModuleLog)
     if (matches(stringResource(R.string.section_about), stringResource(R.string.settings_status),
             stringResource(R.string.settings_collect_log),
             stringResource(R.string.settings_contact_developer),
@@ -617,7 +618,7 @@ internal fun AboutSection(
             // it is developer jargon, not something a user should have to read.
             Text(
                 text = when {
-                    moduleLoadAt > 0L ->
+                    moduleAlive && moduleLoadAt > 0L ->
                         stringResource(R.string.settings_module_loaded, formatTimestamp(moduleLoadAt))
                     else -> stringResource(R.string.settings_module_never)
                 },
