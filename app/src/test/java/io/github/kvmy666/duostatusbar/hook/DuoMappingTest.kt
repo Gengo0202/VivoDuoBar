@@ -212,6 +212,73 @@ class DuoMappingTest {
     }
 
     @Test
+    fun `hiding the charging bolt also permits download digits and keeps their styling`() {
+        val gradient = DownloadGradient(
+            listOf(0xFFFF0000.toInt(), 0xFF0000FF.toInt()),
+            angle = 45
+        )
+        val wash = DownloadWash.of(
+            progress = 64,
+            clockwise = true,
+            charging = false,
+            showPercent = true,
+            active = true,
+            color = 0xFF123456.toInt(),
+            opacity = 0.6f,
+            gradient = gradient
+        )
+        val v = DuoMapping.visual(
+            level = 72, charging = true, saver = false, showPercent = true,
+            wifiLevel = 3, cellLevel = 4, airplane = false,
+            showCharging = false, download = wash, downloadPercent = 64
+        )
+
+        assertEquals("64", v.percentText)
+        assertEquals(0f, v.boltOpacity, 0.0001f)
+        assertEquals(DuoMapping.GREEN_CHARGING, v.tint)
+        assertEquals(wash.leftEnd, v.downloadLeftEnd, 0.0001f)
+        assertEquals(wash.rightEnd, v.downloadRightEnd, 0.0001f)
+        assertEquals(wash.opacity, v.downloadOpacity, 0.0001f)
+        assertEquals(wash.color, v.downloadColor)
+        assertEquals(gradient, v.downloadGradient)
+    }
+
+    @Test
+    fun `a download percentage opens a closed ring and takes the battery seat`() {
+        val v = DuoMapping.visual(
+            level = 72, charging = false, saver = false, showPercent = false,
+            wifiLevel = 3, cellLevel = 4, airplane = false,
+            downloadPercent = 28
+        )
+        assertEquals("28", v.percentText)
+        assertEquals(1f, v.percentOpacity, 0.0001f)
+        assertEquals(half, v.leftArc, 0.0001f)
+        assertEquals(half, v.rightArc, 0.0001f)
+    }
+
+    @Test
+    fun `a download percentage replaces the battery number`() {
+        val v = DuoMapping.visual(
+            level = 72, charging = false, saver = false, showPercent = true,
+            wifiLevel = 3, cellLevel = 4, airplane = false,
+            downloadPercent = 64
+        )
+        assertEquals("64", v.percentText)
+        assertEquals(1f, v.percentOpacity, 0.0001f)
+    }
+
+    @Test
+    fun `charging keeps the bolt while a download percentage is available`() {
+        val v = DuoMapping.visual(
+            level = 72, charging = true, saver = false, showPercent = true,
+            wifiLevel = 3, cellLevel = 4, airplane = false,
+            downloadPercent = 64
+        )
+        assertEquals("", v.percentText.trim())
+        assertEquals(1f, v.boltOpacity, 0.0001f)
+    }
+
+    @Test
     fun `a normal reading shows the number and no bolt`() {
         val v = visual(42)
         assertEquals("42", v.percentText)
@@ -256,6 +323,30 @@ class DuoMappingTest {
         assertEquals(-83, edgeInsetPx(83, 0))
         assertEquals(0, edgeInsetPx(0, 0))
         assertEquals(0, edgeInsetPx(80, 250))
+    }
+
+    @Test
+    fun `an empty middle icon gives back the margin outside the ring`() {
+        // 4.5 design units of the 120-wide artboard sit outside the ring's ink, on each side.
+        assertEquals(3, RingGeometry.outerSlackPx(80))
+        assertEquals(0, RingGeometry.outerSlackPx(0))
+    }
+
+    @Test
+    fun `a locked ring is centered on the status bar and the slider nudges it`() {
+        val centered = lockedTranslationX(0, 1272, 0, 0, 80, 0f)
+        assertEquals(1272 / 2f - 40f, centered, 0.01f)
+        assertEquals(centered + 12f, lockedTranslationX(0, 1272, 0, 0, 80, 12f), 0.01f)
+        // A parent that is inset from the bar, with its own padding, still lands on the bar's center.
+        assertEquals(456f, lockedTranslationX(10, 1000, 10, 4, 80, 0f), 0.01f)
+    }
+
+    @Test
+    fun `a locked ring's center is the vertical center of the status bar`() {
+        val side = 120
+        val y = lockedTranslationY(0, 141, 0, 0, side)
+        val ringCenter = y + (RingGeometry.elementHeightPx(side) - side / 2f)
+        assertEquals(70.5f, ringCenter, 0.01f)
     }
 
     @Test
@@ -552,6 +643,15 @@ class DuoMappingTest {
     }
 
     @Test
+    fun `mobile data off shows no generation even while the radio is still registered`() {
+        // Turning data off leaves voice service up, so the type and NR state still read 5G/4G. The
+        // slot names the data path, and with data off it empties.
+        assertEquals("", DuoMapping.networkGeneration(20, nrConnected = true, dataEnabled = false))
+        assertEquals("", DuoMapping.networkGeneration(13, dataEnabled = false))
+        assertEquals("5G", DuoMapping.networkGeneration(13, nrConnected = true, dataEnabled = true))
+    }
+
+    @Test
     fun `with wifi off the slot shows the cellular generation`() {
         assertEquals(
             DuoMapping.MIDDLE_NETWORK,
@@ -610,6 +710,13 @@ class DuoMappingTest {
         )
         assertEquals(DuoMapping.MIDDLE_WIFI, hidden.middleMode)
         assertEquals("", hidden.networkText)
+        // Wi-Fi off and no generation (mobile data switched off): the slot is empty.
+        val dataOff = DuoMapping.visual(
+            level = 70, charging = false, saver = false, showPercent = true,
+            wifiLevel = 0, cellLevel = 4, airplane = false, wifiOn = false, networkText = ""
+        )
+        assertEquals(DuoMapping.MIDDLE_OFF, dataOff.middleMode)
+        assertEquals("", dataOff.networkText)
     }
 
     @Test

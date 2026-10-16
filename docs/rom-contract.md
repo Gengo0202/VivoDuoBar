@@ -38,7 +38,13 @@ better and add tests, but they must not change any of the following.
 8. **Rive.** `DuoBinder` property names and `PROPERTY_COUNT`, `scene.rml` binds, and
    `app/src/main/res/raw/duo.riv` must equal the scene build (CI `cmp`). The baseline after PR #11 adds
    the split groups (`ringGroup`, `indicatorsGroup`, `cellGroup`), the raised-percentage bind
-   (`percentY`), and the DND-dot moons (`moon1..4Opacity/Scale`, `centerMoonOpacity/Scale`); the
+   (`percentY`), the DND-dot moons (`moon1..4Opacity/Scale`, `centerMoonOpacity/Scale`), and the
+   download wash (`downloadLeftEnd`, `downloadLeftOffset`, `downloadRightEnd`, `downloadRightOffset`,
+   `downloadOpacity`, `downloadColor` — opacity 0 is the idle ring). Its optional linear-gradient
+   variant adds `downloadGradientOpacity`, five colour/stop pairs, and four start/end coordinates;
+   Kotlin keeps the solid and gradient opacities mutually exclusive. While a download asks for its
+   percentage label, `percentText` is that progress and the gap opens even if the battery percentage
+   is off. The
    `DuoPart` enum (`ALL` / `RING` / `INDICATORS`) selects which groups a surface draws. A refactor must
    not rename these binds.
 9. **Fallback order.** Rive → Canvas; attach retry count/timings; overlay-vs-strip placement. A split

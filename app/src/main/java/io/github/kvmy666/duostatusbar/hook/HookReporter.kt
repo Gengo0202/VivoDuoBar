@@ -45,6 +45,7 @@ internal class HookReporter(
                     append(" · size=").append(it.sizePercent).append('%')
                     append(" · offset=").append(it.offsetX).append("dp")
                     append(" · split=").append(it.splitIndicators)
+                    append(" · lock=").append(it.lockRing)
                     append(" · icons=").append(it.indicatorsOffsetX).append("dp")
                     append(" · edge=").append(it.edgePadding).append('%')
                     append(" · percent=").append(it.showPercent)

@@ -38,6 +38,9 @@ internal object SystemReaders {
     fun networkGeneration(context: Context, airplane: Boolean, current: String): String =
         CellReader.networkGeneration(context, airplane, current)
 
+    @SuppressLint("MissingPermission")
+    fun isMobileDataEnabled(context: Context): Boolean = CellReader.isMobileDataEnabled(context)
+
     fun isAirplaneOn(context: Context): Boolean = DeviceStateReader.isAirplaneOn(context)
 
     fun isPowerSaveOn(context: Context): Boolean = DeviceStateReader.isPowerSaveOn(context)

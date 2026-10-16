@@ -72,8 +72,8 @@ object DuoMapping {
         airplane, dnd, wifiOn, hasNetwork, wifiConnected, showAirplane, showDnd
     )
 
-    fun networkGeneration(type: Int, nrConnected: Boolean = false): String =
-        SignalMapping.networkGeneration(type, nrConnected)
+    fun networkGeneration(type: Int, nrConnected: Boolean = false, dataEnabled: Boolean = true): String =
+        SignalMapping.networkGeneration(type, nrConnected, dataEnabled)
 
     fun visual(
         level: Int,
@@ -122,7 +122,19 @@ object DuoMapping {
          * When true, airplane mode turns the four spheres into Wi-Fi strength, and they disappear
          * if Wi-Fi is off too. Out of airplane mode they stay the cellular bars.
          */
-        wifiDots: Boolean = false
+        wifiDots: Boolean = false,
+        /**
+         * Download progress painted on the white ring. [DownloadWash.IDLE] (the default) draws
+         * nothing, so a build with no download looks exactly as it did before.
+         */
+        download: DownloadWash = DownloadWash.IDLE,
+        /**
+         * Download progress to draw in the battery-percentage seat, or null to leave that seat to
+         * the battery. A number opens the gap when the battery percentage is off, and replaces the
+         * battery number when it is on. A visible charging bolt keeps the seat, so the number is
+         * ignored then.
+         */
+        downloadPercent: Int? = null
     ): DuoVisual {
         // The middle slot holds exactly one occupant (FR-06/FR-16): airplane wins, then DND, then
         // Wi-Fi; with Wi-Fi off the slot shows the cellular generation instead. The hand-over itself
@@ -143,13 +155,19 @@ object DuoMapping {
         // The bolt is the only thing the "show charging bolt" switch removes: the ring still tints green
         // for a charging battery, but the top gap goes back to the percentage when the bolt is hidden.
         val chargingVisual = charging && showCharging
-        val percent = if (showPercent && !chargingVisual) level.toString() else ""
-        val closed = RingGeometry.gapClosed(chargingVisual, showPercent)
+        val downloadDigits = if (chargingVisual) null else downloadPercent
+        val percentSeat = showPercent || downloadDigits != null
+        val percent = when {
+            downloadDigits != null -> downloadDigits.toString()
+            showPercent && !chargingVisual -> level.toString()
+            else -> ""
+        }
+        val closed = RingGeometry.gapClosed(chargingVisual, percentSeat)
         return DuoVisual(
             trimLeftEnd = RingGeometry.trimLeft(level, chargingVisual, closed),
             trimRightEnd = RingGeometry.trimRight(level, chargingVisual, closed),
-            leftArc = RingGeometry.leftArc(chargingVisual, showPercent),
-            rightArc = RingGeometry.rightArc(chargingVisual, showPercent),
+            leftArc = RingGeometry.leftArc(chargingVisual, percentSeat),
+            rightArc = RingGeometry.rightArc(chargingVisual, percentSeat),
             trackOpacity = 0.22f,
             percentText = percent.ifEmpty { " " },
             percentOpacity = if (percent.isEmpty()) 0f else 1f,
@@ -175,6 +193,13 @@ object DuoMapping {
             wifiLevel = wifiLevel,
             cellLevel = cellLevel,
             charging = chargingVisual,
+            downloadLeftEnd = download.leftEnd,
+            downloadLeftOffset = download.leftOffset,
+            downloadRightEnd = download.rightEnd,
+            downloadRightOffset = download.rightOffset,
+            downloadOpacity = download.opacity,
+            downloadColor = download.color,
+            downloadGradient = download.gradient,
             visible = visible,
             animateCharge = animateCharge && showCharging
         )

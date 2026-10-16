@@ -94,12 +94,32 @@ object RingGeometry {
     /** The original square artboard. The ring still occupies this square; [ARTBOARD_HEIGHT] is taller. */
     const val ARTBOARD_SIZE = 120f
 
+    /**
+     * How far the ring's ink reaches from the artboard centre.
+     *
+     * The path radius is 51.5 and the stroke is 8, drawn on the path, so the ink ends 4 units outside it.
+     * The rest of the artboard, on each side, is empty margin around that ink.
+     */
+    const val RING_INK_RADIUS = 55.5f
+
     /** Artboard height after [PERCENT_LIFT] was added above the ring. */
     const val ARTBOARD_HEIGHT = ARTBOARD_SIZE + PERCENT_LIFT
 
     /** View height for a ring [side] px wide, including the raised percentage. */
     fun elementHeightPx(side: Int): Int =
         (side * ARTBOARD_HEIGHT / ARTBOARD_SIZE).toInt().coerceAtLeast(1)
+
+    /**
+     * Pixels of [side] that sit outside the ring's ink, on one side.
+     *
+     * That margin is the slot's leftover padding once the middle icon is gone. Giving it back lets the
+     * neighbouring status icons sit against the ring instead of against an empty box.
+     */
+    fun outerSlackPx(side: Int): Int {
+        if (side <= 0) return 0
+        val fraction = (ARTBOARD_SIZE / 2f - RING_INK_RADIUS) / ARTBOARD_SIZE
+        return (side * fraction).toInt()
+    }
 
     /**
      * Moves a taller view up so the ring stays where the old square view put it. The added height

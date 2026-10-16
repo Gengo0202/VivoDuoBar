@@ -6,12 +6,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
 import android.media.AudioManager
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.hardware.display.DisplayManager
 import android.os.PowerManager
+import android.provider.Settings
 import android.view.Display
 import io.github.kvmy666.duostatusbar.L
 import io.github.kvmy666.duostatusbar.settings.DuoPrefs
@@ -48,8 +51,24 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
     private var registered = false
     /** When the last arrival fired, for the AOD burst guard. */
     private var lastRevealAt = 0L
+    private val downloadDisplay = DownloadProgress.DisplaySelection()
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** True while [mobileDataObserver] is registered. */
+    private var watchingMobileData = false
+
+    /**
+     * The mobile-data toggle writes `mobile_data` or `mobile_data<subscriptionId>`. Neither is a
+     * broadcast the monitor already receives, and voice service stays up, so without this the 5G/4G
+     * label would sit until the next unrelated refresh.
+     */
+    private val mobileDataObserver = object : ContentObserver(handler) {
+        override fun onChange(selfChange: Boolean, uri: Uri?) {
+            val key = uri?.lastPathSegment
+            if (key == null || key.startsWith(CellReader.MOBILE_DATA_SETTING)) refresh()
+        }
+    }
 
     /** Removes the pending hide when the screen comes back before the departure has finished. */
     private val hideRunnable = Runnable { host.setElementsVisible(false) }
@@ -72,7 +91,11 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
                     // anything (a captive portal drops the default route to cellular), so the active
                     // path is re-read on connectivity changes too.
                     ConnectivityManager.CONNECTIVITY_ACTION,
-                    ACTION_SERVICE_STATE_CHANGED -> refresh()
+                    ACTION_SERVICE_STATE_CHANGED,
+                    // Mobile data on/off changes the connection without moving the Wi-Fi radio or the
+                    // voice service state, so the generation has to be re-read on the data connection too.
+                    ACTION_ANY_DATA_STATE -> refresh()
+                    DownloadProgress.ACTION -> onDownload(intent)
                 }
             } catch (t: Throwable) {
                 L.e("receiver ${intent?.action}: ${t.javaClass.simpleName}: ${t.message}")
@@ -89,6 +112,41 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         charging = plugged || status == BatteryManager.BATTERY_STATUS_CHARGING
         if (charging != wasCharging) L.i("charging -> $charging")
         setLevel(target)
+    }
+
+    /** Asks the punch-hole module for the download it is already showing, if any. */
+    private fun requestDownloadState() {
+        try {
+            L.i("download query send target=${context.packageName}")
+            context.sendBroadcast(
+                Intent(DownloadProgress.ACTION_QUERY).setPackage(context.packageName)
+            )
+        } catch (t: Throwable) {
+            L.w("download query: ${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+
+    private fun onDownload(intent: Intent?) {
+        if (intent == null) return
+        val next = DownloadProgress.from(intent)
+        val prev = DownloadProgress.current
+        DownloadProgress.current = next
+        downloadDisplay.update(next.active)
+        host.setDownloadTap(next.active, ::toggleDownloadDisplay)
+        L.i(
+            "download broadcast received ctxPkg=${context.packageName} " +
+                "intentPkg=${intent.`package`} ${DownloadProgress.trace(next)}"
+        )
+        if (prev.active != next.active) {
+            L.i("download -> ${if (next.active) "on ${next.progress}%" else "off"}")
+        }
+        render()
+    }
+
+    private fun toggleDownloadDisplay() {
+        if (!downloadDisplay.toggle()) return
+        L.i("download display -> ${if (downloadDisplay.showingDownload) "download" else "battery"}")
+        render()
     }
 
     private fun onPowerSaveChanged() {
@@ -182,8 +240,11 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
                 addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
                 addAction(ConnectivityManager.CONNECTIVITY_ACTION)
                 addAction(ACTION_SERVICE_STATE_CHANGED)
+                addAction(ACTION_ANY_DATA_STATE)
+                addAction(DownloadProgress.ACTION)
             }
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            L.i("download receiver registered ctxPkg=${context.packageName} action=${DownloadProgress.ACTION}")
             // The sticky battery broadcast is not guaranteed to be delivered to the receiver at
             // registration, so read it directly: without this the element shows its default 100 % (and
             // fills the ring to match) until the next battery change, which on some devices is minutes.
@@ -191,7 +252,9 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
             saver = SystemReaders.isPowerSaveOn(context)
             airplane = SystemReaders.isAirplaneOn(context)
             dnd = SystemReaders.isDndOn(context)
+            watchMobileData()
             refresh()
+            requestDownloadState()
             L.i("state monitor up: level=$level charging=$charging saver=$saver airplane=$airplane dnd=$dnd")
         } catch (t: Throwable) {
             L.e("monitor start failed: ${t.javaClass.simpleName}: ${t.message}")
@@ -211,9 +274,31 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
     fun stop() {
         if (!registered) return
         registered = false
+        host.setDownloadTap(false, ::toggleDownloadDisplay)
         runCatching { fill?.cancel() }
         runCatching { handler.removeCallbacks(hideRunnable) }
+        unwatchMobileData()
         runCatching { context.unregisterReceiver(receiver) }
+    }
+
+    private fun watchMobileData() {
+        if (watchingMobileData) return
+        try {
+            context.contentResolver.registerContentObserver(
+                Settings.Global.CONTENT_URI,
+                true,
+                mobileDataObserver
+            )
+            watchingMobileData = true
+        } catch (t: Throwable) {
+            L.w("mobile data watch: ${t.message}")
+        }
+    }
+
+    private fun unwatchMobileData() {
+        if (!watchingMobileData) return
+        watchingMobileData = false
+        runCatching { context.contentResolver.unregisterContentObserver(mobileDataObserver) }
     }
 
     /**
@@ -280,7 +365,11 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
                 host.simChoice == "sim2" -> levels.getOrElse(1) { levels.getOrElse(0) { cellLevel } }
                 else -> SystemReaders.cellLevel(context, airplane, cellLevel)
             }
-            networkText = SystemReaders.networkGeneration(context, airplane, networkText)
+            val generation = SystemReaders.networkGeneration(context, airplane, networkText)
+            if (generation != networkText) {
+                L.i("network -> ${generation.ifEmpty { "off" }}")
+                networkText = generation
+            }
             render()
         } catch (t: Throwable) {
             L.w("refresh: ${t.message}")
@@ -352,6 +441,12 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         // Every element the host owns - the main bar's and, on the lock screen, the keyguard bar's.
         if (host.duo == null) return
         try {
+            val downloadState = downloadDisplay.apply(DownloadProgress.current)
+            // Physical charging still controls the green tint. Only a visible bolt owns the
+            // percentage seat and its narrower gap.
+            val chargingVisual = charging && host.showChargingBolt
+            val downloadPercent = downloadState.displayedPercent(chargingVisual)
+            val percentSeat = host.showPercent || downloadPercent != null
             val visual = DuoMapping.visual(
                     level = displayedLevel,
                     charging = charging,
@@ -372,7 +467,12 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
                     showDnd = host.showDnd,
                     dndDots = host.dndMode == DuoPrefs.DND_DOTS,
                     percentHeight = host.percentHeight,
-                    wifiDots = host.wifiDots
+                    wifiDots = host.wifiDots,
+                    // The wash must use the same visible gap as the base ring. A physically charging
+                    // battery still tints green when its bolt is hidden, but both strokes use the
+                    // percentage geometry in that case.
+                    download = downloadState.toWash(chargingVisual, percentSeat),
+                    downloadPercent = downloadPercent
                 )
             host.render(visual)
         } catch (t: Throwable) {
@@ -394,5 +494,8 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
 
         /** `TelephonyManager.ACTION_SERVICE_STATE_CHANGED`, spelled out: the constant is not public. */
         const val ACTION_SERVICE_STATE_CHANGED = "android.intent.action.SERVICE_STATE"
+
+        /** `TelephonyIntents.ACTION_ANY_DATA_CONNECTION_STATE_CHANGED`, spelled out: the constant is hidden. */
+        const val ACTION_ANY_DATA_STATE = "android.intent.action.ANY_DATA_STATE"
     }
 }

@@ -3,6 +3,7 @@ package io.github.kvmy666.duostatusbar.hook
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import io.github.kvmy666.duostatusbar.L
 import io.github.kvmy666.duostatusbar.hook.rom.RomAdapter
 import io.github.kvmy666.duostatusbar.hook.rom.RomResources
@@ -248,6 +249,39 @@ internal class ContainerFinder(
         val batteryEmpty = battery == null || battery.width == 0
         val iconsEmpty = icons == null || icons.width == 0
         return batteryEmpty && iconsEmpty
+    }
+
+    /**
+     * A frame the locked ring can be centered in.
+     *
+     * It has to span the status bar, so the center is the screen's center (where a punch-hole sits), and
+     * it has to be the bar rather than a full-screen window, so the ring stays in the status-bar band.
+     * The icon strip and the end-side cluster are skipped: those are the views that move when the clock
+     * gets wider. The nearest ancestor that qualifies wins; a full-screen frame is only a last resort.
+     */
+    fun findLockFrame(strip: View, barRoot: View): FrameLayout? {
+        val rootWidth = barRoot.width
+        val rootHeight = barRoot.height
+        if (rootWidth <= 0 || rootHeight <= 0) return null
+        val windowIsScreen = rootHeight > rootWidth
+        var view: View? = strip.parent as? View
+        var screenSized: FrameLayout? = null
+        while (view != null) {
+            if (view is FrameLayout) {
+                val spansWidth = view.width >= rootWidth * 9 / 10
+                if (spansWidth) {
+                    val asTallAsWindow = view.height >= rootHeight * 9 / 10
+                    if (windowIsScreen && asTallAsWindow) {
+                        if (screenSized == null) screenSized = view
+                    } else {
+                        return view
+                    }
+                }
+            }
+            if (view === barRoot) break
+            view = view.parent as? View
+        }
+        return screenSized
     }
 
     /**

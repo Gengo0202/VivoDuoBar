@@ -182,7 +182,7 @@ internal object Diag {
             settings?.let {
                 appendLine("  settings: enabled=${it.enabled} useRive=${it.useRive} showPercent=${it.showPercent}")
                 appendLine("    size=${it.sizePercent}% offset=${it.offsetX}dp live=${it.liveApply} rev=${it.revision}")
-                appendLine("    split=${it.splitIndicators} iconsOffset=${it.indicatorsOffsetX}dp edge=${it.edgePadding}%")
+                appendLine("    split=${it.splitIndicators} lock=${it.lockRing} iconsOffset=${it.indicatorsOffsetX}dp edge=${it.edgePadding}%")
                 appendLine("    animations=${it.animationsEnabled} arrival=${it.arrivalEnabled} " +
                         "departure=${it.departureEnabled} charging=${it.chargingEnabled}")
                 appendLine("    clockFont=${it.systemClockFont} revealMs=${it.revealMs} " +
@@ -250,6 +250,7 @@ internal object Diag {
                     "wifiLevel=${SystemReaders.wifiLevel(context, -1)}")
             sb.appendLine("  cellLevel=${SystemReaders.cellLevel(context, airplane, -1)} " +
                     "generation=${SystemReaders.networkGeneration(context, airplane, "?")} " +
+                    "mobileData=${SystemReaders.isMobileDataEnabled(context)} " +
                     "cellLevels=${SystemReaders.cellLevels(context, airplane)}")
             sb.appendLine("  airplane=$airplane saver=${SystemReaders.isPowerSaveOn(context)} " +
                     "dnd=${SystemReaders.isDndOn(context)}")

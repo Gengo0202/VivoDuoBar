@@ -40,4 +40,24 @@ class DuoSettingPreviewTest {
             previous = phase
         }
     }
+
+    @Test
+    fun `locked position preview puts zero in the middle and reaches both edges`() {
+        assertEquals(0f, positionPreviewOffset(0f, 360f, 120f), 0.0001f)
+        assertEquals(-120f, positionPreviewOffset(-360f, 360f, 120f), 0.0001f)
+        assertEquals(120f, positionPreviewOffset(360f, 360f, 120f), 0.0001f)
+    }
+
+    @Test
+    fun `locked position range follows the screen instead of a fixed two hundred dp cap`() {
+        assertEquals(337, positionOffsetLimit(673, centered = true))
+    }
+
+    @Test
+    fun `position press steps one dp and stops at either limit`() {
+        assertEquals(11, stepPositionOffset(10, direction = 1, limitDp = 20))
+        assertEquals(9, stepPositionOffset(10, direction = -1, limitDp = 20))
+        assertEquals(20, stepPositionOffset(20, direction = 1, limitDp = 20))
+        assertEquals(-20, stepPositionOffset(-20, direction = -1, limitDp = 20))
+    }
 }

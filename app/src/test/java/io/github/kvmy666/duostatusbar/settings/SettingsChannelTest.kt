@@ -46,6 +46,9 @@ class SettingsChannelTest {
             tapAction = "toggle_flashlight",
             doubleTapAction = "show_notifications",
             longPressAction = "take_screenshot",
+            indicatorsTapAction = "show_quick_settings",
+            indicatorsDoubleTapAction = "toggle_wifi",
+            indicatorsLongPressAction = "toggle_power_saving",
             iconColor = "black",
             hideOtherIcons = false
         )
@@ -54,16 +57,42 @@ class SettingsChannelTest {
     }
 
     @Test
-    fun `out of range values are clamped on write, not stored`() {
+    fun `older split settings inherit ring actions for the icons`() {
+        context.getSharedPreferences("duo_settings", Context.MODE_PRIVATE).edit()
+            .clear()
+            .putString(DuoPrefs.COL_TAP, "toggle_flashlight")
+            .putString(DuoPrefs.COL_DOUBLE_TAP, "show_notifications")
+            .putString(DuoPrefs.COL_LONG_PRESS, "take_screenshot")
+            .apply()
+
+        val read = DuoPrefs.read(context, DuoOrientation.PORTRAIT)
+
+        assertEquals(read.tapAction, read.indicatorsTapAction)
+        assertEquals(read.doubleTapAction, read.indicatorsDoubleTapAction)
+        assertEquals(read.longPressAction, read.indicatorsLongPressAction)
+    }
+
+    @Test
+    fun `unlocked ring and indicator offsets retain their two hundred dp cap`() {
         DuoPrefs.write(
             context,
             DuoSettings(sizePercent = 9_999, offsetX = 9_999, percentHeight = 9_999, indicatorsOffsetX = 9_999)
         )
         val read = DuoPrefs.read(context)
         assertEquals(DuoPrefs.MAX_SIZE, read.sizePercent)
-        assertEquals(DuoPrefs.MAX_OFFSET, read.offsetX)
+        assertEquals(DuoPrefs.MAX_UNLOCKED_RING_OFFSET, read.offsetX)
         assertEquals(DuoPrefs.MAX_PERCENT_HEIGHT, read.percentHeight)
-        assertEquals(DuoPrefs.MAX_OFFSET, read.indicatorsOffsetX)
+        assertEquals(DuoPrefs.MAX_INDICATORS_OFFSET, read.indicatorsOffsetX)
+    }
+
+    @Test
+    fun `screen locked ring offset is not artificially capped`() {
+        DuoPrefs.write(
+            context,
+            DuoSettings(splitIndicators = true, lockRing = true, offsetX = 9_999)
+        )
+
+        assertEquals(9_999, DuoPrefs.read(context).offsetX)
     }
 
     @Test
@@ -85,6 +114,9 @@ class SettingsChannelTest {
                 tapAction = "toggle_flashlight",
                 doubleTapAction = "no_action",
                 longPressAction = "take_screenshot",
+                indicatorsTapAction = "show_quick_settings",
+                indicatorsDoubleTapAction = "toggle_wifi",
+                indicatorsLongPressAction = "toggle_power_saving",
                 percentHeight = 40,
                 splitIndicators = true,
                 indicatorsOffsetX = -18
@@ -107,6 +139,9 @@ class SettingsChannelTest {
         assertEquals("toggle_flashlight", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_TAP)])
         assertEquals("no_action", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_DOUBLE_TAP)])
         assertEquals("take_screenshot", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_LONG_PRESS)])
+        assertEquals("show_quick_settings", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_INDICATORS_TAP)])
+        assertEquals("toggle_wifi", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_INDICATORS_DOUBLE_TAP)])
+        assertEquals("toggle_power_saving", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_INDICATORS_LONG_PRESS)])
         assertEquals(1000, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_REVEAL_MS)])
         // FR-15b / FR-08b: the two newest columns must travel too, or the module would never see them.
         assertEquals("auto", row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_ICON_COLOR)])
@@ -125,6 +160,7 @@ class SettingsChannelTest {
         // Off unless the user asks: a missing choice keeps the cellular dots.
         assertEquals(0, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_WIFI_DOTS)])
         assertEquals(DuoPrefs.DEFAULT_EDGE_PADDING, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_EDGE_PADDING)])
+        assertEquals(0, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_LOCK_RING)])
         // One set published alone is copied into the landscape columns, so rotation does not go blank.
         assertEquals(130, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.LAND_PREFIX + DuoPrefs.COL_SIZE_PERCENT)])
         assertEquals(7, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.LAND_PREFIX + DuoPrefs.COL_OFFSET_X)])
@@ -164,6 +200,32 @@ class SettingsChannelTest {
         val row = DuoSettingsProvider.rowFor(DuoSettings(edgePadding = 25), revision = 1L)
         assertEquals(25, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_EDGE_PADDING)])
         assertEquals(25, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.LAND_PREFIX + DuoPrefs.COL_EDGE_PADDING)])
+    }
+
+    @Test
+    fun `locking the ring travels through the channel and defaults off`() {
+        context.getSharedPreferences("duo_settings", Context.MODE_PRIVATE).edit().clear().commit()
+        DuoPrefs.write(context, DuoSettings(lockRing = true, splitIndicators = true), DuoOrientation.PORTRAIT)
+        DuoPrefs.write(context, DuoSettings(lockRing = false, sizePercent = 110), DuoOrientation.LANDSCAPE)
+        assertEquals(true, DuoPrefs.read(context, DuoOrientation.PORTRAIT).lockRing)
+        assertEquals(false, DuoPrefs.read(context, DuoOrientation.LANDSCAPE).lockRing)
+        val row = DuoSettingsProvider.rowFor(
+            DuoPrefs.read(context, DuoOrientation.PORTRAIT),
+            revision = 1L,
+            DuoPrefs.read(context, DuoOrientation.LANDSCAPE)
+        )
+        assertEquals(1, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.COL_LOCK_RING)])
+        assertEquals(0, row[DuoPrefs.COLUMNS.indexOf(DuoPrefs.LAND_PREFIX + DuoPrefs.COL_LOCK_RING)])
+        val columns = DuoPrefs.PORTRAIT_COLUMNS.filter { it != DuoPrefs.COL_LOCK_RING }.toTypedArray()
+        val full = DuoSettingsProvider.rowFor(DuoSettings(lockRing = true), 1L)
+        val values = full.copyOfRange(0, DuoPrefs.PORTRAIT_COLUMNS.size).toMutableList()
+        values.removeAt(DuoPrefs.PORTRAIT_COLUMNS.indexOf(DuoPrefs.COL_LOCK_RING))
+        val cursor = MatrixCursor(columns).apply { addRow(values) }
+        cursor.use {
+            it.moveToFirst()
+            val read = DuoSettingsClient.fromCursor(it, Configuration.ORIENTATION_PORTRAIT)
+            assertEquals(false, read.lockRing)
+        }
     }
 
     @Test

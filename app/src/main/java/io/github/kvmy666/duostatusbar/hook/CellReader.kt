@@ -2,6 +2,7 @@ package io.github.kvmy666.duostatusbar.hook
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.provider.Settings
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import io.github.kvmy666.duostatusbar.L
@@ -13,6 +14,9 @@ import io.github.kvmy666.duostatusbar.L
  * slightly stale number is far better than a status bar that throws (FR-21).
  */
 internal object CellReader {
+
+    /** `Settings.Global.MOBILE_DATA`. Hidden from the SDK stub, so the name is spelled out. */
+    const val MOBILE_DATA_SETTING = "mobile_data"
 
     /** Cellular spheres 0..4. */
     fun cellLevel(context: Context, airplane: Boolean, current: Int): Int = try {
@@ -60,8 +64,12 @@ internal object CellReader {
 
     /**
      * The cellular generation the phone is on ("5G"/"4G"/"3G"/"2G"), or empty when there is no
-     * service. Empty is a real answer here (unknown type), so it is returned as-is rather than
-     * masked by the last value; only a failed read keeps the caller's value (FR-21).
+     * service. Empty is a real answer here (unknown type, or mobile data switched off), so it is
+     * returned as-is rather than masked by the last value; only a failed read keeps the caller's
+     * value (FR-21).
+     *
+     * Data off is empty on purpose. The voice radio stays registered, so the network type and NR
+     * state would still say 5G/4G; the middle slot is the data-path label, and with data off it goes.
      */
     @SuppressLint("MissingPermission")
     fun networkGeneration(context: Context, airplane: Boolean, current: String): String = try {
@@ -71,11 +79,41 @@ internal object CellReader {
             val data = tm?.dataNetworkType ?: TelephonyManager.NETWORK_TYPE_UNKNOWN
             val type = if (data != TelephonyManager.NETWORK_TYPE_UNKNOWN) data
             else tm?.voiceNetworkType ?: TelephonyManager.NETWORK_TYPE_UNKNOWN
-            DuoMapping.networkGeneration(type, nrConnected = isNrConnected(tm))
+            DuoMapping.networkGeneration(
+                type,
+                nrConnected = isNrConnected(tm),
+                dataEnabled = isMobileDataEnabled(context)
+            )
         }
     } catch (t: Throwable) {
         L.w("networkGeneration: ${t.message}")
         current
+    }
+
+    /**
+     * Whether the user has mobile data switched on for the default data line.
+     *
+     * Unreadable means "still on": blanking a working 5G/4G label is worse than keeping it (FR-21).
+     * The settings key is only the fallback; `TelephonyManager.isDataEnabled()` is the toggle itself,
+     * including the per-SIM switch the quick-settings tile writes.
+     */
+    @SuppressLint("MissingPermission")
+    fun isMobileDataEnabled(context: Context): Boolean = try {
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+        if (tm != null) tm.isDataEnabled else mobileDataSetting(context)
+    } catch (t: Throwable) {
+        L.w("isMobileDataEnabled: ${t.message}")
+        mobileDataSetting(context)
+    }
+
+    /**
+     * `Settings.Global.MOBILE_DATA` (`"mobile_data"`). Hidden from the SDK stub, so the name is
+     * spelled out. Defaults to on when the setting cannot be read.
+     */
+    private fun mobileDataSetting(context: Context): Boolean = try {
+        Settings.Global.getInt(context.contentResolver, MOBILE_DATA_SETTING, 1) == 1
+    } catch (_: Throwable) {
+        true
     }
 
     /**

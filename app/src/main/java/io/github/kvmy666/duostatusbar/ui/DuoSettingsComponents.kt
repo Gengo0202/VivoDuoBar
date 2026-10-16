@@ -2,8 +2,10 @@ package io.github.kvmy666.duostatusbar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -206,12 +208,14 @@ internal fun ModuleHealthCard(
  * It is drawn to look like the real bar — a dark pill with the clock on the left and the element where
  * the battery sits — and the element is the **same Canvas element** the status bar falls back to, driven
  * by the same [DuoMapping]. Dragging anywhere on the bar moves it, and the value is shown so it can be
- * set exactly.
+ * set exactly. A tap or long press on either half nudges the element one dp in that direction.
  */
 @Composable
 internal fun PositionEditor(
     offsetDp: Int,
+    maxOffsetDp: Int,
     enabled: Boolean,
+    centered: Boolean = false,
     label: String? = null,
     hint: String? = null,
     visual: DuoVisual? = null,
@@ -220,48 +224,79 @@ internal fun PositionEditor(
     val density = LocalDensity.current
     var drag by remember { mutableFloatStateOf(offsetDp.toFloat()) }
     LaunchedEffect(offsetDp) { drag = offsetDp.toFloat() }
-    val limit = DuoPrefs.MAX_OFFSET.toFloat()
+    val limit = maxOffsetDp.coerceAtLeast(1).toFloat()
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label ?: stringResource(R.string.settings_position), style = MaterialTheme.typography.bodyMedium)
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(40.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .background(Color(0xFF101014))
-                .pointerInput(enabled) {
+        ) {
+            val previewTravel = (maxWidth.value - 32f).coerceAtLeast(0f) / 2f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .pointerInput(enabled, limit) {
+                        if (!enabled) return@pointerInput
+                        detectTapGestures(
+                            onTap = { position ->
+                                val direction = if (position.x < size.width / 2f) -1 else 1
+                                val next = stepPositionOffset(drag.toInt(), direction, limit.toInt())
+                                drag = next.toFloat()
+                                onOffset(next)
+                            },
+                            onLongPress = { position ->
+                                val direction = if (position.x < size.width / 2f) -1 else 1
+                                val next = stepPositionOffset(drag.toInt(), direction, limit.toInt())
+                                drag = next.toFloat()
+                                onOffset(next)
+                            }
+                        )
+                    }
+                    .pointerInput(enabled, centered, limit, previewTravel) {
                     if (!enabled) return@pointerInput
                     detectDragGestures { _, amount ->
-                        val next = (drag + amount.x / density.density).coerceIn(-limit, limit)
+                        val dragScale = if (centered) limit / previewTravel.coerceAtLeast(1f) else 1f
+                        val next = (drag + amount.x / density.density * dragScale)
+                            .coerceIn(-limit, limit)
                         drag = next
                         onOffset(next.toInt())
                     }
                 },
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = "9:41",
-                color = Color.White,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(start = 14.dp)
-            )
-            DuoRiveStill(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp)
-                    .size(32.dp),
-                visual = visual ?: DuoMapping.visual(
-                    level = 40,
-                    charging = false,
-                    saver = false,
-                    showPercent = true,
-                    wifiLevel = 3,
-                    cellLevel = 4,
-                    airplane = false
-                ),
-                translationXDp = drag
-            )
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = "9:41",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 14.dp)
+                )
+                val previewOffset = if (centered) {
+                    positionPreviewOffset(drag, limit, previewTravel)
+                } else {
+                    drag
+                }
+                DuoRiveStill(
+                    modifier = Modifier
+                        .align(if (centered) Alignment.Center else Alignment.CenterEnd)
+                        .then(if (centered) Modifier else Modifier.padding(end = 16.dp))
+                        .size(32.dp),
+                    visual = visual ?: DuoMapping.visual(
+                        level = 40,
+                        charging = false,
+                        saver = false,
+                        showPercent = true,
+                        wifiLevel = 3,
+                        cellLevel = 4,
+                        airplane = false
+                    ),
+                    translationXDp = previewOffset
+                )
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -280,6 +315,24 @@ internal fun PositionEditor(
             ) { Text(stringResource(R.string.settings_position_reset)) }
         }
     }
+}
+
+/** Maps a real screen offset onto the smaller status-bar preview without changing its zero point. */
+internal fun positionPreviewOffset(offsetDp: Float, limitDp: Float, previewTravelDp: Float): Float {
+    if (limitDp <= 0f || previewTravelDp <= 0f) return 0f
+    return offsetDp.coerceIn(-limitDp, limitDp) / limitDp * previewTravelDp
+}
+
+/** The locked ring travels from screen center to either edge; strip-anchored parts can cross it all. */
+internal fun positionOffsetLimit(screenWidthDp: Int, centered: Boolean): Int {
+    val width = screenWidthDp.coerceAtLeast(1)
+    return if (centered) (width + 1) / 2 else width
+}
+
+/** Moves a position editor by one dp in [direction], without crossing its configured bounds. */
+internal fun stepPositionOffset(offsetDp: Int, direction: Int, limitDp: Int): Int {
+    val limit = limitDp.coerceAtLeast(1)
+    return (offsetDp + direction.coerceIn(-1, 1)).coerceIn(-limit, limit)
 }
 
 @Composable
@@ -598,4 +651,3 @@ internal fun RootAccessSetting() {
         }
     }
 }
-

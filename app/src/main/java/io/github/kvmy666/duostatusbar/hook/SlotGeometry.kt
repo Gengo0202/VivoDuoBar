@@ -115,3 +115,38 @@ internal fun edgeInsetPx(sidePx: Int, paddingPercent: Int): Int {
     val percent = paddingPercent.coerceIn(0, 100)
     return sidePx * percent / 100 - sidePx
 }
+
+/**
+ * Horizontal translation that puts a [side] px view on the center of the status bar, then nudges it by
+ * [offsetPx]. [barLeft] and [parentLeft] are window coordinates. Gravity pins the view to the parent's
+ * left padding, so the translation is the whole distance from that edge to the centered seat.
+ *
+ * The status bar's center does not move when the clock gets wider. A translation written from it stays
+ * put with no further layout pass.
+ */
+internal fun lockedTranslationX(
+    barLeft: Int,
+    barWidth: Int,
+    parentLeft: Int,
+    parentPaddingLeft: Int,
+    side: Int,
+    offsetPx: Float
+): Float = barLeft + barWidth / 2f - side / 2f - parentLeft - parentPaddingLeft + offsetPx
+
+/**
+ * Vertical translation that puts the ring on the vertical center of the status bar.
+ *
+ * The view is taller than the ring: the extra artboard space sits above it, so the ring's center is
+ * `height - side/2` from the top of the view. Gravity pins that top to the parent's top padding.
+ */
+internal fun lockedTranslationY(
+    barTop: Int,
+    barHeight: Int,
+    parentTop: Int,
+    parentPaddingTop: Int,
+    side: Int
+): Float {
+    val height = RingGeometry.elementHeightPx(side)
+    val ringFromTop = height - side / 2f
+    return barTop + barHeight / 2f - ringFromTop - parentTop - parentPaddingTop
+}
