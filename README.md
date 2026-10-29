@@ -95,7 +95,7 @@ adb shell settings put global duo_statusbar_stage 2   # full animation
 
 ## If something goes wrong
 
-- Issues: https://github.com/Gengo0202/VivoDuoBar/issues
+- Issues: https://github.com/kvmy666/duoStatusBar/issues
 - Telegram: https://t.me/kvmy1
 
 Send a report from the app's **About** section. It includes your device details and the logs, which
