@@ -37,6 +37,7 @@ gradlew assembleRelease
 ## 反馈问题
 
 重启系统界面后几分钟内，在 App 的模块健康卡片点击 **Send a bug report** 导出诊断文件，附带到 [issue](https://github.com/Gengo0202/VivoDuoBar/issues)。
+
 （OriginOS 会过滤系统界面的 logcat 输出，App 内导出是唯一可靠的日志通道。）
 
 
