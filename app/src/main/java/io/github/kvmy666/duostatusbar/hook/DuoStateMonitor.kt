@@ -82,6 +82,45 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         }
     }
 
+    /**
+     * The colour poll (vivo OriginOS is the reason this exists): the clock's colour changes through
+     * paths no hook can observe there, so while the screen is on the clock is re-read every
+     * [TINT_POLL_MS] and the element re-rendered on a change.
+     *
+     * The poll does **not** stand down when tint events are observed: an event-driven ROM gets an
+     * instant re-render from its hooks *and* the poll as the correctness backstop, so a poisoned,
+     * stale or missing event stream can never freeze the colour (the frozen-clock bug: vivo rebuilds
+     * the strip, the old view's colour stops updating, and whatever trusted it stopped too). One int
+     * read and a compare per tick, screen-off only excluded. Auto colour only; a manual black/white
+     * override makes the poll pointless and it skips its work.
+     */
+    private val tintPoll = object : Runnable {
+        override fun run() {
+            try {
+                if (host.iconColor !in listOf("black", "white") && isInteractive()) {
+                    val color = host.sampleClockColor()
+                    if (color != null && color != 0) {
+                        if (BarTint.updateDirect(color)) render()
+                    } else {
+                        host.refreshClock()
+                    }
+                }
+            } catch (_: Throwable) {
+                // A colour sample must never disturb SystemUI.
+            }
+            handler.postDelayed(this, TINT_POLL_MS)
+        }
+    }
+
+    private fun startTintPoll() {
+        handler.removeCallbacks(tintPoll)
+        handler.postDelayed(tintPoll, TINT_POLL_MS)
+    }
+
+    private fun stopTintPoll() {
+        handler.removeCallbacks(tintPoll)
+    }
+
     /** Removes the pending hide when the screen comes back before the departure has finished. */
     private val hideRunnable = Runnable { host.setElementsVisible(false) }
 
@@ -200,6 +239,7 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         handler.removeCallbacks(hideRunnable)
         host.setElementsVisible(true)
         visible = true
+        startTintPoll()
         // FR-25: the arrival animation is optional. With it off the element simply appears; the fill
         // still catches up below.
         if (host.arrivalEnabled && isInteractive() && revealAllowed()) {
@@ -219,6 +259,7 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         // re-laid out several times a second, and an element that is only half hidden flickers with it.
         // The AOD has its own status bar, so the element has no business being there.
         handler.removeCallbacks(hideRunnable)
+        stopTintPoll()
         if (host.departureEnabled) {
             visible = false
             render()
@@ -271,6 +312,7 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
             requestDownloadState()
             runCatching { DuoGuard(context).noteHeartbeat() }
             handler.postDelayed(heartbeatRunnable, HEARTBEAT_MS)
+            startTintPoll()
             L.i("state monitor up: level=$level charging=$charging saver=$saver airplane=$airplane dnd=$dnd")
         } catch (t: Throwable) {
             L.e("monitor start failed: ${t.javaClass.simpleName}: ${t.message}")
@@ -294,6 +336,7 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         runCatching { fill?.cancel() }
         runCatching { handler.removeCallbacks(hideRunnable) }
         runCatching { handler.removeCallbacks(heartbeatRunnable) }
+        stopTintPoll()
         unwatchMobileData()
         runCatching { context.unregisterReceiver(receiver) }
     }
@@ -436,7 +479,22 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
         val color = when (host.iconColor) {
             "black" -> BarTint.BLACK
             "white" -> BarTint.WHITE
-            else -> BarTint.fgColor(context)
+            else -> {
+                // The clock is the visual ground truth: it sits in the bar beside the element, and its
+                // `currentTextColor` is the colour SystemUI last applied to it — readable on every ROM
+                // (vivo OriginOS re-tints it through paths no hook can see). Re-read it on *every*
+                // colour query, so the poll below and any event-driven render both converge on what
+                // the user actually sees, and a poisoned or stale event can never outvote it.
+                val sampled = host.sampleClockColor()
+                if (sampled != null) {
+                    BarTint.updateDirect(sampled)
+                } else {
+                    // No readable clock (vivo rebuilt the strip and the old view came off its
+                    // window): re-resolve it now so the next tick samples a live view.
+                    host.refreshClock()
+                }
+                BarTint.fgColor(context)
+            }
         }
         // Log only on a real change: it names the colour and where it came from, which is the one fact a
         // "the colour does not follow the bar" report is missing.
@@ -517,5 +575,8 @@ internal class DuoStateMonitor(private val context: Context, private val host: D
 
         /** How often the module proves it is alive; the app treats a much older stamp as "gone". */
         private const val HEARTBEAT_MS = 20_000L
+
+        /** The colour poll's interval: fast enough to look live, small enough to cost nothing. */
+        private const val TINT_POLL_MS = 500L
     }
 }

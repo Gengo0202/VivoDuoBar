@@ -362,8 +362,8 @@ internal object RootLogs {
         echo '=== kernel modules ==='
         grep -i -E 'kernelsu|ksu' /proc/modules 2>/dev/null
         echo '=== installed module package ==='
-        pm path io.github.kvmy666.duostatusbar 2>&1
-        dumpsys package io.github.kvmy666.duostatusbar 2>/dev/null | head -n 40
+        pm path io.github.gengo0202.vivoduobar 2>&1
+        dumpsys package io.github.gengo0202.vivoduobar 2>/dev/null | head -n 40
         echo '=== build props ==='
         getprop ro.product.manufacturer
         getprop ro.product.brand
@@ -388,7 +388,7 @@ internal object RootLogs {
         echo '=== LSPosed logs ==='
         ls -t /data/adb/lspd/log/modules_*.log 2>&1 | head -1
         echo '=== installed module package ==='
-        pm path io.github.kvmy666.duostatusbar 2>&1
+        pm path io.github.gengo0202.vivoduobar 2>&1
         echo '=== build props ==='
         getprop ro.product.manufacturer
         getprop ro.product.brand

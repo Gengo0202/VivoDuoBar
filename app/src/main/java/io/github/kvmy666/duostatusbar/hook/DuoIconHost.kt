@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import io.github.kvmy666.duostatusbar.L
 import io.github.kvmy666.duostatusbar.hook.rom.RomDetection
 import io.github.kvmy666.duostatusbar.hook.rom.RomProfiles
@@ -30,8 +31,15 @@ import io.github.kvmy666.duostatusbar.hook.rom.RomResources
  * Ids are resolved against SystemUI's own resources at runtime, so a ROM that spells them differently
  * still works as long as the AOSP names are present; `system_icons` is tried first, then the
  * OxygenOS spellings.
+ *
+ * [onClockFound] fires once, with the clock view, the first time the controller resolves it — the
+ * hook side uses it to install a `setTextColor` hook on the clock's *runtime* class, which catches
+ * OEMs that override the method (a base-class hook would never see those).
  */
-internal class DuoIconHost(private val context: Context) {
+internal class DuoIconHost(
+    private val context: Context,
+    private val onClockFound: (TextView) -> Unit = {}
+) {
 
     /** Where the element view is actually added. Usually the strip; the lock frame when the ring is pinned. */
     private var host: ViewGroup? = null
@@ -619,12 +627,33 @@ internal class DuoIconHost(private val context: Context) {
         reapplyHiding()
     }
 
+    /**
+     * Re-runs only the placement maths against the *current* geometry, on the element view's own
+     * layout changes (see the listener installed in `attach`). Nothing is re-read from the settings
+     * provider and no layout is requested: `place()` is arithmetic over cached values, and writing an
+     * unchanged translation is a no-op, so the constant clock-tick relayouts of the bar cost nothing
+     * while a ROM-initiated move (the scrcpy report) is corrected on the very next frame.
+     */
+    private fun reseat() {
+        try {
+            val view = element?.ui ?: return
+            val container = host ?: return
+            val measureFrom = hideStrip ?: container
+            val side = geometry.sidePx(measureFrom, root, capToBarHeight = true)
+            place(view, container, root, side, settings.offsetX, center = true)
+        } catch (_: Throwable) {
+            // A re-seat must never disturb SystemUI.
+        }
+    }
+
     /** Size and offset come from the settings, so reshaping the element needs no re-injection (FR-03/17). */
     private fun applyLayout() {
         val view = element?.ui ?: return
         val measureFrom = hideStrip ?: host ?: return
         try {
-            val side = geometry.sidePx(measureFrom, root)
+            // capToBarHeight: the main bar's element may never leave the status-bar band, even when
+            // the window root's height is momentarily 0 or full-screen (the giant-element race).
+            val side = geometry.sidePx(measureFrom, root, capToBarHeight = true)
             // assignBox only rewrites layoutParams when the box actually changed. Re-assigning them
             // (even to the same numbers) requests a layout pass, and a layout pass on the Rive
             // TextureView is what took System UI down on rotation.
@@ -722,6 +751,15 @@ internal class DuoIconHost(private val context: Context) {
         view.translationX = lockedTranslationX(
             0, frame.width, 0, frame.paddingLeft, side, offsetDp * density
         )
+        if (rom.anchorY) {
+            val anchor = verticalAnchor(frame)
+            if (anchor != null) {
+                placeAnchored(view, anchor, side, limitToBar = true)
+                return
+            }
+            // No anchor measurable yet: fall through to the frame-centre maths, and the next
+            // layout pass (placeLocked runs again from applyLayout) retries with real bounds.
+        }
         view.translationY = lockedTranslationY(
             0, frame.height, 0, frame.paddingTop, side
         )
@@ -753,7 +791,7 @@ internal class DuoIconHost(private val context: Context) {
             val measureFrom = hideStrip ?: host
             val main = element?.ui
             if (measureFrom != null && main != null) {
-                val side = geometry.sidePx(measureFrom, root)
+                val side = geometry.sidePx(measureFrom, root, capToBarHeight = true)
                 if (ringLocked()) hideStrip?.let { ensureSpacer(it, side) }
                 else host?.let { assignBox(main, it, side, ringInset(side)) }
             }
@@ -840,12 +878,89 @@ internal class DuoIconHost(private val context: Context) {
         // translation instead. Default 100 % is zero, so an existing user sees no change.
         val flowInset = if (container is LinearLayout) 0 else edgeInsetPx(side, settings.edgePadding)
         view.translationX = offsetDp * context.resources.displayMetrics.density + flowInset
+        // The main bar's element (its window root is the status-bar window itself) is band-limited:
+        // a transient measurement must never seat the ring outside the status-bar band. The extra
+        // bars (keyguard, shade header) legitimately sit in taller windows and are not limited.
+        val mainBar = windowRoot !== null && windowRoot === root
+        // On an anchorY ROM (vivo OriginOS) the ring is seated on the ROM's own icon row instead of
+        // the window's centre: the OriginOS status-bar window is taller than the visible icon band
+        // (punch-hole headroom above the icons), so the window centre sat the ring visibly above
+        // the row the stock icons are in. Every other ROM keeps the window-centre maths below.
+        if (rom.anchorY) {
+            val anchor = verticalAnchor(container)
+            if (anchor != null) {
+                placeAnchored(view, anchor, side, mainBar)
+                return
+            }
+        }
         // The strip sits low in the window, so centring on it wastes the space above. Centre the
         // ring in the whole status bar instead, which is what lets it grow to the window height.
         // The view is taller than the ring; the extra shift keeps the ring put and leaves the
         // raised percentage in the space above it.
-        view.translationY = (if (center) geometry.windowCenterShiftY(container, windowRoot) else 0f) +
+        val translationY = (if (center) geometry.windowCenterShiftY(container, windowRoot) else 0f) +
             RingGeometry.ringAnchorShiftY(side)
+        if (mainBar && !geometry.ringCentreWithinBar(view, translationY)) {
+            // A transient window height or container position (the scrcpy report: the element jumped
+            // out of the bar when a display change re-laid the window) would land the ring outside
+            // the bar. Keep the last good translation; the next layout pass retries with real bounds.
+            L.w("window-centre seat falls outside the status bar - keeping the last translation")
+            return
+        }
+        view.translationY = translationY
+    }
+
+    /**
+     * Seats the ring's centre on [anchor]'s centre (see [SlotGeometry.anchorShiftY]).
+     *
+     * Applied twice: once now, and once from a `post` after the pending layout pass, because
+     * `view.top` is 0 until the view has actually been laid out and the shift would be wrong by
+     * exactly that top. Writing the same translation twice is cheap and requests no layout.
+     */
+    private fun placeAnchored(view: View, anchor: View, side: Int, limitToBar: Boolean) {
+        val applyShift = {
+            val shift = geometry.anchorShiftY(anchor, view, side, limitToBar)
+            if (!shift.isNaN()) {
+                view.translationY = shift
+                logOnce.once("anchor:${anchor.javaClass.simpleName}") {
+                    L.i("element seated on ${anchor.javaClass.simpleName} centre (translationY=${shift}px)")
+                }
+            }
+        }
+        applyShift()
+        view.post { applyShift() }
+    }
+
+    /**
+     * The view whose vertical centre the ring is aligned to on an anchorY ROM, in preference order:
+     *
+     * 1. the status-bar clock — the ROM itself centres it in the icon row, and the module never
+     *    hides or moves it. Only a clock in the *same window* is accepted, so an extra bar (the
+     *    keyguard's, the shade header's) never anchors against the main window's clock.
+     * 2. the battery slot the element replaces — it sits in the row by definition.
+     * 3. the stock status-icons container.
+     * 4. the container itself, when it is laid out.
+     */
+    private fun verticalAnchor(container: ViewGroup): View? {
+        val clockView = clock.clock()
+        if (clockView != null && clockView.height > 0 && clockView.rootView === container.rootView) {
+            return clockView
+        }
+        val battery = try {
+            finder.findBattery(container)
+        } catch (_: Throwable) {
+            null
+        }
+        if (battery != null && battery.height > 0) return battery
+        val iconsId = RomResources.id(context, rom, "statusIcons")
+        if (iconsId != 0) {
+            val icons = try {
+                container.findViewById<View>(iconsId)
+            } catch (_: Throwable) {
+                null
+            }
+            if (icons != null && icons.height > 0) return icons
+        }
+        return container.takeIf { it.height > 0 }
     }
 
     private fun installRingGestures(view: View) {
@@ -955,7 +1070,11 @@ internal class DuoIconHost(private val context: Context) {
         center: Boolean,
         assign: (DuoElement?) -> Unit
     ): DuoElement? {
-        val side = geometry.sidePx(container, windowRoot, basePx)
+        // The main bar's cluster shares the ring's bar-band cap; an extra bar's cluster keeps that
+        // bar's own window cap, matching its ring.
+        val side = geometry.sidePx(
+            container, windowRoot, basePx, capToBarHeight = windowRoot === root
+        )
         existing?.let { cluster ->
             seatBeside(cluster.ui, container, ringView)
             place(cluster.ui, container, windowRoot, side, settings.indicatorsOffsetX, center)
@@ -1141,7 +1260,10 @@ internal class DuoIconHost(private val context: Context) {
             // [SlotGeometry.appliedSize]) because resizing the Rive view live used to take System UI down.
             geometry.capture(settings.sizePercent, basePx)
             logOnce.once("facts") {
-                DuoSbFacts.report(context, statusBarRoot, target, geometry.widthPx(target))
+                DuoSbFacts.report(
+                    context, statusBarRoot, target, geometry.widthPx(target),
+                    geometry.barHeightPx(), rom.anchorY
+                )
             }
             // The element's real parent: the strip, unless the ROM's strip is a custom container that
             // refuses foreign children. HyperOS 3's MiuiStatusBatteryContainer measured it 0x0 - the icons
@@ -1172,16 +1294,26 @@ internal class DuoIconHost(private val context: Context) {
             L.i("element container: ${parent.javaClass.simpleName}" +
                     if (overlay) " (overlay on ${anchorBattery?.javaClass?.simpleName}, strip ${target.javaClass.simpleName})" else "")
             val container = if (overlay) parent else target
-            val side = geometry.sidePx(target, root)
+            // The clock is resolved before the first layout pass: on an anchorY ROM it is the
+            // vertical anchor, and the colour hook wants its class as early as possible.
+            clock.apply(root, settings.systemClockFont)
+            maybeHookClockTint()
+            val side = geometry.sidePx(target, root, capToBarHeight = true)
             allowOverflow(container)
             candidate.ui.layoutParams = layoutParamsFor(container, side)
             container.addView(candidate.ui)
             host = container
             flowHost = container
             element = candidate
+            // The ROM can move the element by re-laying the strip out (a display change — the first
+            // scrcpy connect does it once per SystemUI run) without rebuilding it: the view's top
+            // changes while our translation stays where it was, and the element lands off the icon
+            // row (the scrcpy offset report; a settings toggle "fixed" it only because re-attaching
+            // re-ran place()). Re-seat on the view's own layout changes — [reseat] is arithmetic and
+            // writing an unchanged translation is a no-op, so the clock-tick relayouts cost nothing.
+            candidate.ui.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> reseat() }
             applyLayout()
             syncIndicators()
-            clock.apply(root, settings.systemClockFont)
             // The stock icons are hidden and the first reveal fires only once the element reports itself
             // live. A Rive state machine binds *after* this method returns (it needs the view attached to a
             // window), so hiding here would cover an empty slot; Canvas reports ready immediately.
@@ -1314,6 +1446,7 @@ internal class DuoIconHost(private val context: Context) {
         reapplyExtraHiding()
         // The clock is re-inflated with the strip on some ROMs, so its font is re-applied here too.
         clock.apply(root, settings.systemClockFont)
+        maybeHookClockTint()
         val strip = hideStrip ?: host ?: return
         // Never hide the stock icons over an element that is not drawing yet: a layout pass can arrive
         // before Rive has bound its view model, and hiding then would leave a blank stretch of status bar.
@@ -1466,7 +1599,6 @@ internal class DuoIconHost(private val context: Context) {
             anchorOriginalVisibility?.let { anchorBattery?.visibility = it }
         } catch (_: Throwable) {
         }
-        clock.restore()
         geometry.reset()
         host = null
         hideStrip = null
@@ -1480,6 +1612,54 @@ internal class DuoIconHost(private val context: Context) {
         repairing = false
         holding = false
         root = null
+        clock.teardown()
+        clockClassHooked = false
+        // Forget the captured bar colour too: the next attach re-bootstraps it from the clock's own
+        // current colour (see [DuoStateMonitor.fgColor]), instead of carrying a stale capture over.
+        BarTint.reset()
+    }
+
+    /**
+     * Fires [onClockFound] once, for the clock's runtime class: the hook side then installs a
+     * `setTextColor` hook declared on *that* class, which catches OEMs overriding the method (a
+     * base `TextView` hook never sees an overridden call). Called after every clock resolution.
+     */
+    private fun maybeHookClockTint() {
+        if (clockClassHooked) return
+        val view = clock.clock() ?: return
+        clockClassHooked = true
+        try {
+            onClockFound(view)
+        } catch (t: Throwable) {
+            L.w("clock tint hook: ${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+
+    /** True once [onClockFound] has fired for this host (reset by teardown). */
+    private var clockClassHooked = false
+
+    /** The clock the tint hook compares against, or null (FR-15b colour sampling). */
+    fun clockForTint(): TextView? = clock.clock()
+
+    /**
+     * Re-resolves the clock right now, whatever invalidated the previous reference (the vivo strip
+     * rebuild). Cheap: the resolve is guarded and only acts when the view actually changed.
+     */
+    fun refreshClock() {
+        clock.apply(root, settings.systemClockFont)
+        maybeHookClockTint()
+    }
+
+    /**
+     * The clock's own current text colour, or null. The bootstrap read behind FR-15b: before any
+     * tint event has been captured, the colour SystemUI last applied to the clock *is* the bar's
+     * colour, and reading it needs no event to have fired — which is exactly the gap a boot-time
+     * first paint falls into.
+     */
+    fun sampleClockColor(): Int? = try {
+        clock.clock()?.currentTextColor?.takeIf { it != 0 && (it ushr 24) != 0 }
+    } catch (_: Throwable) {
+        null
     }
 
     /** FR-03b: the same hide pass for every extra bar, once its own element is drawing. */

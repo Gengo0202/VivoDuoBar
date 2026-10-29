@@ -177,7 +177,7 @@ internal object DuoSettingsClient {
     }
 
     /** Sent by the app after a write, so the module re-reads without polling (NFR-2). */
-    const val ACTION_SETTINGS_CHANGED = "io.github.kvmy666.duostatusbar.SETTINGS_CHANGED"
+    const val ACTION_SETTINGS_CHANGED = "io.github.gengo0202.vivoduobar.SETTINGS_CHANGED"
 
     private val uri: Uri get() = Uri.parse("content://${DuoPrefs.AUTHORITY}")
 

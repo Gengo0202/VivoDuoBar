@@ -3,6 +3,7 @@ package io.github.kvmy666.duostatusbar.settings
 import android.content.Context
 import android.content.res.Configuration
 import android.provider.Settings
+import io.github.kvmy666.duostatusbar.hook.DuoGuard
 
 /**
  * The user's settings, and the contract that carries them into System UI (FR-03/16/17).
@@ -161,8 +162,8 @@ enum class DuoOrientation {
 
 object DuoPrefs {
 
-    const val AUTHORITY = "io.github.kvmy666.duostatusbar.settings"
-    const val ACTION_SETTINGS_CHANGED = "io.github.kvmy666.duostatusbar.SETTINGS_CHANGED"
+    const val AUTHORITY = "io.github.gengo0202.vivoduobar.settings"
+    const val ACTION_SETTINGS_CHANGED = "io.github.gengo0202.vivoduobar.SETTINGS_CHANGED"
 
     /**
      * Sent by the app when the user taps "Restart System UI". The module lives inside System UI, so it is
@@ -170,14 +171,14 @@ object DuoPrefs {
      * back. Needed because the size only takes effect on a fresh start (resizing it live is what used to
      * take System UI down).
      */
-    const val ACTION_RESTART_SYSTEMUI = "io.github.kvmy666.duostatusbar.RESTART_SYSTEMUI"
+    const val ACTION_RESTART_SYSTEMUI = "io.github.gengo0202.vivoduobar.RESTART_SYSTEMUI"
 
     /**
      * Sent by the app just before it builds a bug report. The module replies with a fresh diagnostic
      * dump, so the report shows the bar as it is *at that moment* — the one-shot boot dump cannot show
      * the shade expanded, which is exactly what the shade-position report needs (Issue #1).
      */
-    const val ACTION_DIAGNOSTICS_REQUEST = "io.github.kvmy666.duostatusbar.DIAGNOSTICS_REQUEST"
+    const val ACTION_DIAGNOSTICS_REQUEST = "io.github.gengo0202.vivoduobar.DIAGNOSTICS_REQUEST"
 
     const val COL_ENABLED = "enabled"
     const val COL_USE_RIVE = "use_rive"
@@ -560,7 +561,7 @@ object DuoPrefs {
      * the About screen says which one it is instead of showing a blank report.
      */
     fun moduleLoadTime(context: Context): Long = try {
-        Settings.Global.getLong(context.contentResolver, "duo_statusbar_last_load", 0L)
+        Settings.Global.getLong(context.contentResolver, DuoGuard.KEY_LAST_LOAD, 0L)
     } catch (_: Throwable) {
         0L
     }
@@ -572,7 +573,7 @@ object DuoPrefs {
      * the previous run's dump and status.
      */
     fun heartbeat(context: Context): Long = try {
-        Settings.Global.getLong(context.contentResolver, "duo_statusbar_heartbeat", 0L)
+        Settings.Global.getLong(context.contentResolver, DuoGuard.KEY_HEARTBEAT, 0L)
     } catch (_: Throwable) {
         0L
     }

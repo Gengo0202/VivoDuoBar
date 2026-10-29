@@ -16,12 +16,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- The provider-independent app <-> System UI channel. The module registers its receiver with this
-         signature permission, so only this app can push settings; the app holds it too. -->
+    <!-- The provider-independent app <-> System UI channel. The vivo build's package suffix is part of
+         every identifier here, so this app and the official release can be installed side by side
+         without their providers, receivers or signature permission colliding. -->
     <permission
-        android:name="io.github.kvmy666.duostatusbar.permission.SETTINGS"
+        android:name="io.github.gengo0202.vivoduobar.permission.SETTINGS"
         android:protectionLevel="signature" />
-    <uses-permission android:name="io.github.kvmy666.duostatusbar.permission.SETTINGS" />
+    <uses-permission android:name="io.github.gengo0202.vivoduobar.permission.SETTINGS" />
 
     <application
         android:name=".DuoApp"
@@ -46,7 +47,7 @@
              exposes is non-sensitive (on/off, renderer, size, offset). See settings/DuoPrefs.kt. -->
         <provider
             android:name=".settings.DuoSettingsProvider"
-            android:authorities="io.github.kvmy666.duostatusbar.settings"
+            android:authorities="io.github.gengo0202.vivoduobar.settings"
             android:exported="true"
             android:enabled="true" />
 
@@ -54,7 +55,7 @@
              chat apps truncate. Not exported, and only the diagnostics directory is shared. -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="io.github.kvmy666.duostatusbar.files"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
@@ -75,16 +76,16 @@
             android:name=".settings.SettingsRequestReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="io.github.kvmy666.duostatusbar.action.SETTINGS_REQUEST" />
+                <action android:name="io.github.gengo0202.vivoduobar.action.SETTINGS_REQUEST" />
             </intent-filter>
         </receiver>
         <receiver
             android:name=".settings.StatusBridgeReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="io.github.kvmy666.duostatusbar.action.STATUS_PUSH" />
-                <action android:name="io.github.kvmy666.duostatusbar.action.DUMP_PUSH" />
-                <action android:name="io.github.kvmy666.duostatusbar.action.FALLBACK_PUSH" />
+                <action android:name="io.github.gengo0202.vivoduobar.action.STATUS_PUSH" />
+                <action android:name="io.github.gengo0202.vivoduobar.action.DUMP_PUSH" />
+                <action android:name="io.github.gengo0202.vivoduobar.action.FALLBACK_PUSH" />
             </intent-filter>
         </receiver>
 
@@ -94,7 +95,7 @@
             android:name=".settings.UpdateDownloadReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="io.github.kvmy666.duostatusbar.DOWNLOAD_UPDATE" />
+                <action android:name="io.github.gengo0202.vivoduobar.DOWNLOAD_UPDATE" />
             </intent-filter>
         </receiver>
 
@@ -126,7 +127,7 @@
 
         <meta-data
             android:name="xposeddescription"
-            android:value="Duo Status Bar — replaces the system battery, Wi-Fi and signal icons with Apple's combined 'Duo' element, animated with Rive. Tested on OnePlus 15 / OxygenOS 16 (Android 16)." />
+            android:value="VivoDuoBar — replaces the system battery, Wi-Fi and signal icons with Apple's combined 'Duo' element, animated with Rive. vivo OriginOS adaptation of kvmy666/duoStatusBar (upstream tested on OnePlus 15 / OxygenOS 16)." />
 
         <meta-data
             android:name="xposedminversion"

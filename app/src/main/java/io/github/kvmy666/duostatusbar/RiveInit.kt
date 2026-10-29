@@ -42,7 +42,7 @@ import java.lang.reflect.Field
 internal object RiveInit {
 
     private const val TAG = "DuoSB"
-    private const val MODULE_PACKAGE = "io.github.kvmy666.duostatusbar"
+    private const val MODULE_PACKAGE = "io.github.gengo0202.vivoduobar"
     private const val RIVE_CLASS = "app.rive.runtime.kotlin.core.Rive"
     private const val TYPE_CLASS = "app.rive.runtime.kotlin.core.RendererType"
 

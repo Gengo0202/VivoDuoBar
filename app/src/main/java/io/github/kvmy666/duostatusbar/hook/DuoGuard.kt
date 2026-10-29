@@ -13,15 +13,15 @@ import io.github.kvmy666.duostatusbar.L
  * that, so the protection lives outside the process — in two `Settings.Global` entries, which is the
  * store that actually works here:
  *
- *     duo_statusbar_stage           0 = off (default), 1 = icons only, 2 = icons + Rive
- *     duo_statusbar_rive_attempts   written *before* Rive is created, cleared after it survives
+ *     vivoduobar_stage           0 = off (default), 1 = icons only, 2 = icons + Rive
+ *     vivoduobar_rive_attempts   written *before* Rive is created, cleared after it survives
  *
  * Control, no root and no app needed:
  *
- *     adb shell settings put global duo_statusbar_stage 1   # icons only  (no native code at all)
- *     adb shell settings put global duo_statusbar_stage 2   # icons + Rive
- *     adb shell settings put global duo_statusbar_stage 0   # off
- *     adb shell settings put global duo_statusbar_rive_attempts 0   # clear the crash breaker
+ *     adb shell settings put global vivoduobar_stage 1   # icons only  (no native code at all)
+ *     adb shell settings put global vivoduobar_stage 2   # icons + Rive
+ *     adb shell settings put global vivoduobar_stage 0   # off
+ *     adb shell settings put global vivoduobar_rive_attempts 0   # clear the crash breaker
  *
  * Why not a file: the first version used files under SystemUI's own data dir, and the device refused it
  * from every direction — the module (running as SystemUI's uid) may write there, but `su -c` cannot, so
@@ -35,7 +35,7 @@ import io.github.kvmy666.duostatusbar.L
  * And if Rive dies twice the counter says so and stage 2 is refused — one boot is enough to stop a loop.
  *
  * The stage can also come from the user's settings in the app (over the provider, because a normal app
- * cannot write global settings). Precedence is in [stage]: an explicit `duo_statusbar_stage` wins, then the
+ * cannot write global settings). Precedence is in [stage]: an explicit `vivoduobar_stage` wins, then the
  * app's settings, then off — so adb always has the last word and the app cannot quietly re-enable something
  * that was switched off for diagnosis.
  */
@@ -47,8 +47,8 @@ internal class DuoGuard(private val context: Context) {
     /**
      * The stage that is actually in force, resolved in this order:
      *
-     *   1. `Settings.Global` `duo_statusbar_stage` **when present** (0/1/2). This is the developer override
-     *      and the kill switch: `adb shell settings put global duo_statusbar_stage 0` must always be able to
+     *   1. `Settings.Global` `vivoduobar_stage` **when present** (0/1/2). This is the developer override
+     *      and the kill switch: `adb shell settings put global vivoduobar_stage 0` must always be able to
      *      switch the module off no matter what the app's settings say.
      *   2. otherwise the user's settings from the app (`enabled` + `useRive`).
      *   3. otherwise off.
@@ -198,17 +198,17 @@ internal class DuoGuard(private val context: Context) {
         const val OFF = 0
         const val ICONS_ONLY = 1
         const val RIVE = 2
-        const val KEY_STAGE = "duo_statusbar_stage"
-        const val KEY_ATTEMPTS = "duo_statusbar_rive_attempts"
+        const val KEY_STAGE = "vivoduobar_stage"
+        const val KEY_ATTEMPTS = "vivoduobar_rive_attempts"
 
         /** Wall-clock ms of the last Rive attempt, so the breaker can recognise a stale count. */
-        const val KEY_ATTEMPT_AT = "duo_statusbar_rive_attempt_at"
+        const val KEY_ATTEMPT_AT = "vivoduobar_rive_attempt_at"
 
         /** Wall-clock ms of the last time the module ran inside SystemUI; 0 means it never has. */
-        const val KEY_LAST_LOAD = "duo_statusbar_last_load"
+        const val KEY_LAST_LOAD = "vivoduobar_last_load"
 
         /** Wall-clock ms the module last proved it is alive; refreshed by the state monitor. */
-        const val KEY_HEARTBEAT = "duo_statusbar_heartbeat"
+        const val KEY_HEARTBEAT = "vivoduobar_heartbeat"
         /** How many *processes* may die to Rive before it is given up on. */
         private const val MAX_ATTEMPTS = 2
 

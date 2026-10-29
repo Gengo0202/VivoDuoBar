@@ -26,6 +26,6 @@ class UpdateDownloadReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION = "io.github.kvmy666.duostatusbar.DOWNLOAD_UPDATE"
+        const val ACTION = "io.github.gengo0202.vivoduobar.DOWNLOAD_UPDATE"
     }
 }

@@ -83,6 +83,42 @@ internal object BarTint {
         pendingCount = 0
     }
 
+    /** True once any source has captured a real bar colour. */
+    val hasCaptured: Boolean
+        get() = captured
+
+    /**
+     * Commits a colour from a **single-stable** source — the status-bar clock's own text colour —
+     * immediately, without the [STABLE_READINGS] debounce.
+     *
+     * The debounce exists because `onDarkChanged` can alternate black/white several times a second
+     * on some OEM builds. The clock is not that kind of source: SystemUI sets its text colour once
+     * per real light/dark transition (it is the colour the user actually sees), so a single reading
+     * is already the settled truth, and requiring a second reading would leave the element a
+     * transition behind whenever the ROM only sets it once. Feeds the same [normalized] state, so
+     * the two sources cannot disagree for longer than one transition.
+     */
+    fun updateDirect(color: Int): Boolean {
+        if (color == 0) return false
+        val next = if (isDark(color)) BLACK else WHITE
+        if (captured && next == normalized) {
+            pending = 0
+            pendingCount = 0
+            return false
+        }
+        val changed = !captured || next != normalized
+        normalized = next
+        captured = true
+        pending = 0
+        pendingCount = 0
+        if (changed) {
+            logOnce.once("clock") {
+                L.i("status bar clock text is ${if (next == BLACK) "dark" else "light"} - matching it")
+            }
+        }
+        return changed
+    }
+
     /**
      * The resolved icon colour among a hook callback's arguments, or 0 when none can be one.
      *

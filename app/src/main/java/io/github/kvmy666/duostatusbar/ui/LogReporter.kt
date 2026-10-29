@@ -22,7 +22,7 @@ internal const val DONATE_URL = "https://paypal.me/kroomfahd"
 
 /** Where a fallback report goes: the developer's Telegram, and the issue tracker. */
 internal const val TELEGRAM_CHAT_URL = "https://t.me/kvmy1"
-internal const val GITHUB_NEW_ISSUE = "https://github.com/kvmy666/duoStatusBar/issues/new"
+internal const val GITHUB_NEW_ISSUE = "https://github.com/Gengo0202/VivoDuoBar/issues/new"
 internal val TELEGRAM_PACKAGES = listOf(
     "org.telegram.messenger",
     "org.telegram.messenger.web",

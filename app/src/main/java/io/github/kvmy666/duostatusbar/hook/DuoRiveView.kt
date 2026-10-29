@@ -383,7 +383,7 @@ internal class DuoRiveView(
 
     companion object {
         private const val TAG = "DuoSB"
-        private const val MODULE_PACKAGE = "io.github.kvmy666.duostatusbar"
+        private const val MODULE_PACKAGE = "io.github.gengo0202.vivoduobar"
         private const val RAW_ENTRY = "res/raw/duo.riv"
         private const val ARTBOARD = "Duo"
         private const val STATE_MACHINE = "Duo"

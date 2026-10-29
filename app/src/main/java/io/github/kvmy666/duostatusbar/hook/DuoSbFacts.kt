@@ -23,7 +23,7 @@ internal object DuoSbFacts {
     private const val TAG = "DuoSB"
     private const val FLAG_HARDWARE_ACCELERATED = 0x01000000
 
-    fun report(context: Context, root: View, target: ViewGroup?, slotWidth: Int) {
+    fun report(context: Context, root: View, target: ViewGroup?, slotWidth: Int, barHeightPx: Int = 0, anchorY: Boolean = false) {
         try {
             val lp = root.layoutParams
             val flags = if (lp is WindowManager.LayoutParams) lp.flags else 0
@@ -35,6 +35,8 @@ internal object DuoSbFacts {
             L.i("FLAG_HARDWARE_ACCELERATED declared: ${flags and FLAG_HARDWARE_ACCELERATED != 0}")
             L.i("window attached=${root.isAttachedToWindow} size=${root.width}x${root.height}")
             L.i("density=${context.resources.displayMetrics.density}")
+            if (barHeightPx > 0) L.i("status bar height (framework resource): ${barHeightPx}px")
+            L.i("vertical anchor: ${if (anchorY) "icon row (ROM clock/battery)" else "window centre"}")
             L.i("slot: ${target?.javaClass?.simpleName} ${target?.width}x${target?.height} width=$slotWidth")
             val verdict = if (accelerated) {
                 "verdict: a TextureView can get a Surface here - Rive is worth attempting (stage 2)"

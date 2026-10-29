@@ -30,7 +30,19 @@ internal data class RomAdapter(
      */
     val match: List<String> = emptyList(),
     /** True only when every id was read off a device. Asset data may override only when measured. */
-    val measured: Boolean = false
+    val measured: Boolean = false,
+    /**
+     * True when the element's vertical centre must be anchored to the ROM's own icon row (the clock,
+     * else the battery, else the icon container) instead of the status-bar window's centre.
+     *
+     * vivo OriginOS is the case this exists for: its status-bar window is taller than the visible
+     * icon band (the punch-hole area is inside the window but above the icons), so centring on the
+     * window put the ring visibly above the row the stock icons sit in — the constant vertical offset
+     * reported on the X100s Pro. Anchoring to the clock (which the ROM itself centres in the row)
+     * follows the row wherever the ROM puts it. Default false: every other ROM keeps the window-centre
+     * behaviour exactly as before.
+     */
+    val anchorY: Boolean = false
 )
 
 /**
@@ -55,6 +67,8 @@ internal object RomDetection {
                 colorOs()
             haystack.contains("xiaomi") || haystack.contains("redmi") || haystack.contains("poco") ->
                 hyperOs()
+            haystack.contains("vivo") || haystack.contains("iqoo") || haystack.contains("originos") ->
+                originOs()
             else -> aosp()
         }
     }
@@ -175,6 +189,41 @@ internal object RomDetection {
             "MiuiStatusBatteryContainer holding statusIcons + battery; system_icon_area is the parent",
         match = listOf("xiaomi", "redmi", "poco"),
         measured = true
+    )
+
+    /**
+     * vivo OriginOS 5/6 (Android 15/16), adapted for the X100s Pro user report (OriginOS 6, Android 16,
+     * rooted, LSPosed). vivo keeps the AOSP ids (`system_icons`, `statusIcons`, `battery`, `clock`) in
+     * a tree-walk-reachable form — the generic build attached — but two of its measurements differ
+     * enough to break the stock maths, both handled here:
+     *
+     *  - the status-bar *window* is taller than the visible icon band (punch-hole headroom above the
+     *    icons), so window-centre vertical anchoring sat the ring above the icon row. [anchorY] moves
+     *    the anchor to the ROM's own icon row (the clock, else the battery) instead;
+     *  - transient re-measures of the vivo icon container report the full window height, which the
+     *    generic `measuredWidth` fallback read as a slot width — the occasional giant element. The
+     *    slot base is now clamped against the framework `status_bar_height` (see [SlotGeometry]).
+     *
+     * The container ids are the AOSP spellings first, then the OEM-area spellings other
+     * vivo-class trees keep; the runtime logs every probe, so a report can turn these into measured
+     * facts exactly like the HyperOS profile did.
+     */
+    private fun originOs(): RomAdapter = RomAdapter(
+        id = "originos",
+        label = "OriginOS / vivo (adapted)",
+        systemUiPackage = AOSP,
+        containerIds = listOf(
+            "system_icons",
+            "system_icons_container",
+            "status_bar_end_side_content",
+            "status_bar_contents",
+            "statusIcons"
+        ),
+        batteryId = "battery",
+        notes = "adapted for vivo X100s Pro (OriginOS 6, Android 16): AOSP ids first; " +
+            "icon-row vertical anchor and clamped slot base - see the class comment",
+        match = listOf("vivo", "iqoo", "originos"),
+        anchorY = true
     )
 
     private fun aosp(): RomAdapter = RomAdapter(

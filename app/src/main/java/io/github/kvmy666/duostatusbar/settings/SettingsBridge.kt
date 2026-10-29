@@ -20,11 +20,11 @@ import io.github.kvmy666.duostatusbar.L
  */
 internal object SettingsBridge {
 
-    const val ACTION_SETTINGS_PUSH = "io.github.kvmy666.duostatusbar.action.SETTINGS_PUSH"
-    const val ACTION_SETTINGS_REQUEST = "io.github.kvmy666.duostatusbar.action.SETTINGS_REQUEST"
-    const val ACTION_STATUS_PUSH = "io.github.kvmy666.duostatusbar.action.STATUS_PUSH"
-    const val ACTION_DUMP_PUSH = "io.github.kvmy666.duostatusbar.action.DUMP_PUSH"
-    const val ACTION_FALLBACK_PUSH = "io.github.kvmy666.duostatusbar.action.FALLBACK_PUSH"
+    const val ACTION_SETTINGS_PUSH = "io.github.gengo0202.vivoduobar.action.SETTINGS_PUSH"
+    const val ACTION_SETTINGS_REQUEST = "io.github.gengo0202.vivoduobar.action.SETTINGS_REQUEST"
+    const val ACTION_STATUS_PUSH = "io.github.gengo0202.vivoduobar.action.STATUS_PUSH"
+    const val ACTION_DUMP_PUSH = "io.github.gengo0202.vivoduobar.action.DUMP_PUSH"
+    const val ACTION_FALLBACK_PUSH = "io.github.gengo0202.vivoduobar.action.FALLBACK_PUSH"
 
     /** The provider row, serialized as `ArrayList<Any>` (ints, longs, strings). */
     const val EXTRA_VALUES = "values"
@@ -32,7 +32,7 @@ internal object SettingsBridge {
     const val EXTRA_DUMP = "dump"
     const val EXTRA_FALLBACK = "fallback"
 
-    const val PERMISSION = "io.github.kvmy666.duostatusbar.permission.SETTINGS"
+    const val PERMISSION = "io.github.gengo0202.vivoduobar.permission.SETTINGS"
     const val SYSTEMUI = "com.android.systemui"
 
     /** Publishes one full settings row to System UI. Never throws. */

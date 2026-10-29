@@ -23,7 +23,7 @@ import org.json.JSONObject
 internal object RomProfiles {
 
     private const val ASSET = "rom-profiles.json"
-    private const val MODULE_PACKAGE = "io.github.kvmy666.duostatusbar"
+    private const val MODULE_PACKAGE = "io.github.gengo0202.vivoduobar"
 
     @Volatile
     private var cache: List<RomAdapter>? = null

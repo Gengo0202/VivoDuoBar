@@ -33,10 +33,10 @@ internal data class UpdateInfo(
  */
 internal object UpdateChecker {
 
-    const val RELEASES_PAGE = "https://github.com/kvmy666/duoStatusBar/releases"
+    const val RELEASES_PAGE = "https://github.com/Gengo0202/VivoDuoBar/releases"
 
     private const val GITHUB_API =
-        "https://api.github.com/repos/kvmy666/duoStatusBar/releases?per_page=20"
+        "https://api.github.com/repos/Gengo0202/VivoDuoBar/releases?per_page=20"
 
     private val SEMVER = Regex("""(\d+)\.(\d+)(?:\.(\d+))?(?:-([0-9A-Za-z.]+))?""")
 

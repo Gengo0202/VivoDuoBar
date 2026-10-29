@@ -136,7 +136,8 @@ class DuoHook(private val lp: XC_LoadPackage.LoadPackageParam) {
     /** The single host for this process, created on first use. */
     private fun ensureHost(ctx: Context): DuoIconHost {
         host?.let { return it }
-        return DuoIconHost(ctx).also { host = it }
+        return DuoIconHost(ctx, onClockFound = { clock -> hookClockTint(clock) })
+            .also { host = it }
     }
 
     /**
@@ -664,31 +665,133 @@ class DuoHook(private val lp: XC_LoadPackage.LoadPackageParam) {
      * Captures the colour SystemUI tints its own icons, so the Duo element can match the bar (black on a
      * light bar, white on a dark one) - the "chameleon" behaviour across apps.
      *
-     * Both entry points are best-effort: `onDarkChanged(ArrayList, float, int)` is the AOSP one and
-     * `setIconColor(int, boolean)` the spellings OEM builds added around it. When neither exists the
-     * element falls back to the system day/night setting (see [BarTint]).
+     * Two independent sources are installed, because no single one exists on every ROM:
+     *
+     *  1. **`StatusBarIconView`** tint methods, in *both* package spellings. The class lives in
+     *     `com.android.systemui.statusbar.phone` on AOSP 13+ (and the forks that track it, vivo
+     *     OriginOS included), while the pre-13 spelling and some OEM forks keep
+     *     `com.android.systemui.statusbar`. The old code hooked only the latter, so on any ROM using
+     *     the modern package the hook silently never installed - the colour never followed the bar.
+     *     Every spelling × method combination is tried separately and its result logged, so a report
+     *     shows exactly which entry points exist on the device.
+     *  2. **The status-bar clock's own text colour** — ROM-independent: SystemUI re-tints the clock
+     *     with every bar transition, the clock is a framework `TextView` (public API, no reflection
+     *     into SystemUI), and the module never hides it. A base `TextView.setTextColor` hook covers
+     *     non-overriding implementations; an OEM that *overrides* the method on its clock class is
+     *     caught by [hookClockTint] once the clock view has been resolved.
+     *
+     * When neither source ever fires, the element falls back to the system day/night setting
+     * (see [BarTint]).
      */
     private fun hookBarAppearance() {
         L.guard("DuoHook bar appearance") {
-            val cls = XposedHelpers.findClass(
-                "com.android.systemui.statusbar.StatusBarIconView", lp.classLoader
-            )
-            val callback = object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    try {
-                        // `onDarkChanged` carries a float `darkIntensity` and an int `tint`; some OEM
-                        // builds pass the intensity as an int too. [BarTint.pickTint] keeps only the
-                        // int(s) that can be a resolved colour, so an intensity is never read as one.
-                        val color = BarTint.pickTint(param.args)
-                        if (color != 0 && BarTint.update(color)) monitor?.onBarAppearanceChanged()
-                    } catch (t: Throwable) {
-                        L.w("bar tint: ${t.javaClass.simpleName}: ${t.message}")
+            // Source 1: the icon view's tint pipeline, in every spelling the ROMs keep.
+            for (className in listOf(
+                "com.android.systemui.statusbar.phone.StatusBarIconView", // AOSP 13+ / modern forks
+                "com.android.systemui.statusbar.StatusBarIconView"        // pre-13 / OEM legacy
+            )) {
+                try {
+                    val cls = XposedHelpers.findClass(className, lp.classLoader)
+                    var methods = 0
+                    for (methodName in listOf("onDarkChanged", "setIconColor", "setColor", "updateIconColor")) {
+                        try {
+                            XposedBridge.hookAllMethods(cls, methodName, iconTintCallback)
+                            methods++
+                        } catch (_: Throwable) {
+                            // Not present on this build - the next spelling/method is the point.
+                        }
                     }
+                    L.i("bar tint: $methods tint method(s) hooked on $className")
+                } catch (_: Throwable) {
+                    L.i("bar tint: $className not present on this ROM")
                 }
             }
-            XposedBridge.hookAllMethods(cls, "onDarkChanged", callback)
-            XposedBridge.hookAllMethods(cls, "setIconColor", callback)
-            L.i("bar appearance hook installed (StatusBarIconView) - FR-15b")
+            // Source 2: the clock's text colour, through the framework class every clock builds on.
+            try {
+                val cls = XposedHelpers.findClass("android.widget.TextView", lp.classLoader)
+                XposedBridge.hookAllMethods(cls, "setTextColor", clockTintCallback)
+                L.i("bar tint: clock colour sampling installed (TextView.setTextColor)")
+            } catch (t: Throwable) {
+                L.w("bar tint: clock sampling unavailable: ${t.javaClass.simpleName}: ${t.message}")
+            }
+            L.i("bar appearance hooks installed - FR-15b")
+        }
+    }
+
+    /**
+     * Hooks `setTextColor` as *declared* on the clock's runtime class. Called from the host the first
+     * time the clock is resolved: an OEM that overrides the method never reaches the base
+     * `TextView` hook, so the override itself is hooked here. If the class does not declare it, the
+     * base hook already covers the clock and this is a no-op.
+     */
+    private fun hookClockTint(clock: android.widget.TextView) {
+        L.guard("DuoHook clock tint") {
+            var hooked = 0
+            for (parameterType in listOf(
+                Int::class.javaPrimitiveType!!,
+                android.content.res.ColorStateList::class.java
+            )) {
+                try {
+                    val method = XposedHelpers.findMethodExact(
+                        clock.javaClass, "setTextColor", parameterType
+                    )
+                    XposedBridge.hookMethod(method, clockTintCallback)
+                    hooked++
+                } catch (_: Throwable) {
+                    // Not declared on this class - the base TextView hook already covers it.
+                }
+            }
+            L.i("clock tint hook on ${clock.javaClass.name}: $hooked declared overload(s)")
+        }
+    }
+
+    /** `StatusBarIconView`'s tint: resolve the colour out of the arguments and feed the debounced state. */
+    private val iconTintCallback = object : XC_MethodHook() {
+        override fun afterHookedMethod(param: MethodHookParam) {
+            try {
+                // `onDarkChanged` carries a float `darkIntensity` and an int `tint`; some OEM
+                // builds pass the intensity as an int too. [BarTint.pickTint] keeps only the
+                // int(s) that can be a resolved colour, so an intensity is never read as one.
+                val color = BarTint.pickTint(param.args)
+                if (color != 0) {
+                    if (BarTint.update(color)) monitor?.onBarAppearanceChanged()
+                    return
+                }
+                // The pre-13 AOSP signature drives the icons off `darkIntensity` alone (the int
+                // tint is 0/transparent and only applies inside tint areas): 1f is dark icons on
+                // a light bar, 0f is light icons on a dark one. OEMs that never hand a usable
+                // colour (the vivo report) still dispatch the intensity, so it is the colour here.
+                val intensity = param.args.filterIsInstance<Float>().firstOrNull()
+                if (intensity != null) {
+                    val derived = if (intensity >= 0.5f) BarTint.BLACK else BarTint.WHITE
+                    if (BarTint.update(derived)) monitor?.onBarAppearanceChanged()
+                }
+            } catch (t: Throwable) {
+                L.w("bar tint: ${t.javaClass.simpleName}: ${t.message}")
+            }
+        }
+    }
+
+    /**
+     * The clock's text colour. Guarded by identity: `setTextColor` runs on every TextView in
+     * SystemUI, and only the status-bar clock's call carries the bar's colour. The clock is a
+     * single-stable source (SystemUI sets it once per transition), so it commits directly.
+     */
+    private val clockTintCallback = object : XC_MethodHook() {
+        override fun afterHookedMethod(param: MethodHookParam) {
+            try {
+                val host = host ?: return
+                val view = param.thisObject as? android.widget.TextView ?: return
+                if (view !== host.clockForTint()) return
+                val color = when (val first = param.args.firstOrNull()) {
+                    is Int -> first
+                    is android.content.res.ColorStateList -> first.defaultColor
+                    else -> return
+                }
+                if (color != 0 && BarTint.updateDirect(color)) monitor?.onBarAppearanceChanged()
+            } catch (_: Throwable) {
+                // Never let a colour sample disturb SystemUI.
+            }
         }
     }
 
@@ -745,7 +848,16 @@ class DuoHook(private val lp: XC_LoadPackage.LoadPackageParam) {
         /** How long a burst of settings changes is allowed to settle before one apply runs. */
         const val SETTINGS_DEBOUNCE_MS = 250L
         const val RETRY_MS = 2_000L
-        const val MAX_ATTEMPTS = 6
+
+        /**
+         * How many times the icon strip is awaited after the status-bar window appears. Six attempts
+         * (~12.5 s) covered OxygenOS, but the vivo X100s Pro report shows its SystemUI inflating the
+         * strip later: the first round gave up ("attach failed after 6 attempts") and only recovered
+         * because the app happened to push settings three seconds later — at a plain boot, with no app
+         * running, the element would simply never appear. Twenty attempts (~40 s) covers the slow
+         * inflation; each attempt is one cheap tree probe on the main handler.
+         */
+        const val MAX_ATTEMPTS = 20
 
         /**
          * How many times a boot-time stage read is retried when the settings provider is unreachable, and
