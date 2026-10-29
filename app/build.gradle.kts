@@ -37,15 +37,17 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.kvmy666.duostatusbar"
+        // vivo build keeps its own identity, so it installs beside the official release instead of
+        // over it (different signature anyway); every cross-app identifier below follows this suffix.
+        applicationId = "io.github.gengo0202.vivoduobar"
         // Android 13 (API 33) is the floor. Every API the module uses above 33 is guarded
         // (`RECEIVER_EXPORTED`, `POST_NOTIFICATIONS`), and the view probes it depends on exist on 13 as
         // well. Support is best-effort: the ROM adapters were measured on 14+, so 13 attaches through the
         // AOSP path and reports through the diagnostic dump if anything is off. targetSdk stays 36.
         minSdk = 33
         targetSdk = 36
-        versionCode = 24
-        versionName = "1.4.3-beta.1"
+        versionCode = 1
+        versionName = "1.0.1"
         // Telegram log delivery. Prefer the relay URL (Worker holds the bot token, so no secret is in the
         // APK); otherwise fall back to the direct bot token; otherwise the button opens the share sheet.
         // The relay URL is public (the Worker enforces its own rate limit), so it is baked into every
