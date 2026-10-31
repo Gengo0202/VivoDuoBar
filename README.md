@@ -40,25 +40,6 @@ gradlew assembleRelease
 
 （OriginOS 会过滤系统界面的 logcat 输出，App 内导出是唯一可靠的日志通道。）
 
-## 上游同步与防误推
-
-本仓库是 vivo/OriginOS 自用适配 fork。**修改只在 fork 内维护，不向上游推送**——适配改动对上游（OnePlus/OxygenOS 用户）没有意义，且 **GPL-3.0 不要求向上游回馈**：保留原许可证与版权声明、注明修改内容、随 APK 公开本仓库源码，即已完全合规。
-
-本地克隆已配置三层防护，防止误将 vivo 适配推到错误的地方：
-
-1. **GitHub 权限层**（天然存在）：本账号对上游 `kvmy666/duoStatusBar` 无推送权限，直接被 403 拒绝；
-2. **远程配置层**：`upstream` 远程已设为只读（推送地址为 DISABLE），`git push upstream` 会在本地立即失败；
-3. **pre-push 钩子**：`.git/hooks/pre-push` 只放行 `Gengo0202/VivoDuoBar`，其余目标一律拦截（如确需绕过，用 `git push --no-verify`）。
-
-同步上游更新的正确姿势（只拉不推）：
-
-```
-git fetch upstream
-git merge upstream/main   # 或 cherry-pick 需要的提交，解决冲突后正常推送本仓库即可
-```
-
-**网页端注意**：GitHub 的 fork 页面有 "Contribute / Open pull request" 按钮，默认对上游发起 PR——本项目的 vivo 适配**不发起**上游 PR，请勿点击。
-
 ---
 
 # 以下为上游项目信息
