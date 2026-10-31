@@ -1,0 +1,24 @@
+#!/bin/sh
+# Blocks pushes to anywhere but this fork's own repository.
+#
+# This fork is a personal vivo/OriginOS adaptation of duoStatusBar. Its changes
+# are meaningless (and unwelcome noise) upstream, and GPL-3.0 imposes no
+# obligation to send them there - see "上游同步与防误推" in the README.
+#
+# pre-push receives: $1 = destination remote's name, $2 = its URL.
+remote="$1"
+url="$2"
+case "$url" in
+    *Gengo0202/VivoDuoBar.git*)
+        exit 0
+        ;;
+    *)
+        echo "push BLOCKED: target '$remote' ($url) is not Gengo0202/OriginDuo." >&2
+        echo "" >&2
+        echo "This is a personal vivo adaptation fork. Pulling from upstream is" >&2
+        echo "fine ('git fetch upstream'), pushing to it is not - the upstream" >&2
+        echo "authors never asked for OriginOS-specific changes, and the GPL" >&2
+        echo "does not require contributing back." >&2
+        exit 1
+        ;;
+esac
